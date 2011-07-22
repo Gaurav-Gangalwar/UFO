@@ -7,8 +7,8 @@ yum install python26-setuptools
 easy_install-2.6 xattr netifaces eventlet greenlet paste pastedeploy configobj coverage  webob simplejson nose
 mkdir -p /usr/local/gluster-object/config 2>> /dev/null
 rm -rf /usr/local/gluster-object/config/*
-cp swift/config/* /usr/local/gluster-object/config/
-cd swift
+cp gluster-object/config/* /usr/local/gluster-object/config/
+cd gluster-object
 python2.6 setup.py install
 gluster-object-config
 gluster-object-stop

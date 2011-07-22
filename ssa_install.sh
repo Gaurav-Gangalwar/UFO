@@ -7,8 +7,8 @@ rm -rf /usr/lib/python2.6/site-packages/* >> /dev/null
 cp -r usr/lib/python2.6/site-packages/* /usr/lib/python2.6/site-packages/ >> /dev/null
 mkdir -p /usr/local/gluster-object/config 2>> /dev/null
 rm -rf /usr/local/gluster-object/config/*
-cp swift/config/* /usr/local/gluster-object/config/
-cd swift
+cp gluster-object/config/* /usr/local/gluster-object/config/
+cd gluster-object
 python2.6 setup.py install
 gluster-object-config
 gluster-object-stop
