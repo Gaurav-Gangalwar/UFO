@@ -1,0 +1,352 @@
+#!/usr/bin/env python
+# Copyright (c) 2011 Gluster, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+import os
+import socket
+
+RUN_DIR = '/var/run/swift'
+SYSLOG_DIR = '/etc/rsyslog.d'
+SYSLOG_CONF = '/etc/rsyslog.conf'
+SYSLOG_STR = '$PrivDropToGroup adm'
+LOG_DIR = '/var/log/swift'
+LOG_DIR1 = '/var/log/swift/hourly'
+CONFIG_PATH = '/etc/swift'
+CONFIG_PATH_OBJ = '/etc/swift/object-server'
+CONFIG_PATH_CONT = '/etc/swift/container-server'
+CONFIG_PATH_ACC = '/etc/swift/account-server'
+CONFIG_FILES_PATH = "/usr/local/gluster-object/config"
+
+def mkdirs(path):
+    if not os.path.isdir(path):
+        try:
+            os.makedirs(path)    
+        except OSError:
+            print 'Failed to create %s' % path
+            exit(0)
+
+    
+def remove_certificates(data):
+    tmp_data = []
+
+    for item in data:
+        if item.startswith('cert_file') or \
+           item.startswith('key_file'):
+            continue
+
+        if item.startswith('bind_port'):
+            item = 'bind_port = 8080'
+
+        tmp_data.append(item)
+
+    """
+    if os.path.exists('/etc/swift/cert.crt'):
+        os.unlink('/etc/swift/cert.crt')
+
+    if os.path.exists('/etc/swift/cert.key'):
+        os.unlink('/etc/swift/cert.key')
+    """
+
+    return tmp_data
+
+
+def create_certificates():
+    while True:
+        resp = raw_input("Do you want to generate certificate/key for https(y/n): ")
+        if resp.lower() == 'y' or resp.lower() == 'n':
+            break
+        print 'Enter valid value: y/n'
+        continue
+
+    if resp.lower() == 'y':
+        cmnd = 'openssl req -new -x509 -nodes -out /etc/swift/cert.crt -keyout /etc/swift/cert.key'
+        os.system(cmnd)
+
+def add_key(data, key):
+    key = key.strip(' ')
+    tmp_data = []
+    for item in data:
+        if item.startswith('super_admin_key'):
+            item = 'super_admin_key = %s' % key
+
+        tmp_data.append(item)
+
+    return tmp_data
+
+def add_object_port(data, port):
+    tmp_data = []
+    for item in data:
+        if item.startswith('object_port'):
+            item = 'object_port = %s' % port
+
+        tmp_data.append(item)
+
+    return tmp_data
+
+def add_container_port(data, port):
+    tmp_data = []
+    for item in data:
+        if item.startswith('container_port'):
+            item = 'container_port = %s' % port
+
+        tmp_data.append(item)
+
+    return tmp_data
+
+def add_account_port(data, port):
+    tmp_data = []
+    for item in data:
+        if item.startswith('account_port'):
+            item = 'account_port = %s' % port
+
+        tmp_data.append(item)
+
+    return tmp_data
+
+
+def add_ip(data, ip):
+    ip = ip.strip(' ')
+    tmp_data = []
+    for item in data:
+        if item.startswith('default_swift_cluster'):
+            if sock == 1:
+                item = 'default_swift_cluster = local#https://%s:443/v1#https://127.0.0.1:443/v1' % ip
+            else:
+                item = 'default_swift_cluster = local#http://%s:8080/v1#http://127.0.0.1:8080/v1' % ip
+
+        tmp_data.append(item)
+
+    return tmp_data
+
+    
+def is_valid_ipv4_address(address):
+    try:
+        addr= socket.inet_pton(socket.AF_INET, address)
+    except AttributeError: # no inet_pton here, sorry
+        try:
+            addr= socket.inet_aton(address)
+        except socket.error:
+            return False
+        return address.count('.') == 3
+    except socket.error: # not a valid address
+        return False
+
+    return True
+
+def is_valid_ipv6_address(address):
+    try:
+        addr= socket.inet_pton(socket.AF_INET6, address)
+    except socket.error: # not a valid address
+        return False
+    return True
+
+def is_valid_ip(ip):
+           return is_valid_ipv4_address(ip) or is_valid_ipv6_address(ip)
+
+def check_num(num):
+    if not num:
+        return False
+    try:
+        num = int(num)
+    except:
+        return False
+
+    return True
+
+def update_object_conf(port):
+    fp = open(CONFIG_PATH_OBJ + '/' + '1.conf', "r")
+    data = []
+    while True:
+        line = fp.readline()
+        if not line:
+            break
+        line = line.strip(' ')
+        if line.startswith('bind_port'):
+            line = 'bind_port = %s' % port
+        data.append(line)
+    fp.close()
+    fp = open(CONFIG_PATH_OBJ + '/' + '1.conf', "w")
+    for item in data:
+        item = item.strip('\n')
+        fp.write(item + '\n')
+    fp.close()
+
+def update_container_conf(port):
+    fp = open(CONFIG_PATH_CONT + '/' + '1.conf', "r")
+    data = []
+    while True:
+        line = fp.readline()
+        if not line:
+            break
+        line = line.strip(' ')
+        if line.startswith('bind_port'):
+            line = 'bind_port = %s' % port
+        data.append(line)
+    fp.close()
+    fp = open(CONFIG_PATH_CONT + '/' + '1.conf', "w")
+    for item in data:
+        item = item.strip('\n')
+        fp.write(item + '\n')
+    fp.close()
+
+def update_account_conf(port):
+    fp = open(CONFIG_PATH_ACC + '/' + '1.conf', "r")
+    data = []
+    while True:
+        line = fp.readline()
+        if not line:
+            break
+        line = line.strip(' ')
+        if line.startswith('bind_port'):
+            line = 'bind_port = %s' % port
+        data.append(line)
+    fp.close()
+    fp = open(CONFIG_PATH_ACC + '/' + '1.conf', "w")
+    for item in data:
+        item = item.strip('\n')
+        fp.write(item + '\n')
+    fp.close()    
+    
+if __name__ == '__main__':        
+    while True:
+        ip = raw_input("Enter external IP for Storage-Server: ")
+        if not ip or not is_valid_ip(ip):
+            print '!!!Invalid ip\n'
+            continue
+        key = raw_input("Enter Super Admin key:")
+        if not key:
+            print '!!!Invalid key\n'
+            continue
+            
+        object_port = raw_input("Enter Object server port (Press Enter for default 6010):")
+        if object_port and not check_num(object_port):
+            print '!!!Invalid object port\n'
+            continue
+        if object_port:
+            object_port = int(object_port)
+            
+        container_port = raw_input("Enter Container server port (Press Enter for default 6011):")
+        if container_port and not check_num(container_port):
+            print '!!!Invalid container port\n'
+            continue
+        if container_port:
+            container_port = int(container_port)
+            
+        account_port = raw_input("Enter Account server port (Press Enter for default 6012):")
+        if account_port and not check_num(account_port):
+            print '!!!Invalid account port\n'
+            continue
+        if account_port:
+            account_port = int(account_port)
+            
+        sock = raw_input("Enter '1' for https '2' for 'http' (Recommended is https):")
+        if not sock or not check_num(sock):
+            print '!!!Invalid option\n'
+            continue
+        sock = int(sock)
+        if sock != 1 and sock != 2:
+            print '!!!Invalid option\n'
+            continue
+
+        break
+
+        
+    cmnds = ['cp %s/proxy-server.conf /etc/swift/ >> /dev/null' % CONFIG_FILES_PATH,
+             'cp %s/swift.conf /etc/swift/ >> /dev/null' % CONFIG_FILES_PATH,
+             'cp %s/object-server.conf /etc/swift/object-server/1.conf >> /dev/null' % CONFIG_FILES_PATH,
+             'cp %s/container-server.conf /etc/swift/container-server/1.conf >> /dev/null' % CONFIG_FILES_PATH,
+             'cp %s/account-server.conf /etc/swift/account-server/1.conf >> /dev/null' % CONFIG_FILES_PATH]
+
+
+    mkdirs(RUN_DIR)
+    
+    if os.path.isdir(SYSLOG_DIR):
+        skip_syslog_conf = False
+        cmnd = 'cp %s/10-swift.conf /etc/rsyslog.d/10-swift.conf >> /dev/null' % CONFIG_FILES_PATH
+        if not os.path.exists(SYSLOG_CONF):
+            skip_syslog_conf = True
+        else:
+            fp = open(SYSLOG_CONF, "r")
+            while True:
+                line = fp.readline()
+                if not line:
+                    break
+                if line.startswith('#'):
+                    continue
+                line = line.strip(' ').strip('\n')
+                if line == SYSLOG_STR:
+                    skip_syslog_conf = True
+            fp.close()
+
+        if not skip_syslog_conf:
+            fp = open(SYSLOG_CONF, "a")
+            fp.write('\n' + SYSLOG_STR + '\n')
+            fp.close()
+        
+        os.system(cmnd)
+        mkdirs(LOG_DIR)
+        mkdirs(LOG_DIR1)
+        cmnd = 'chown -R syslog.adm /var/log/swift 2>> /dev/null'
+        os.system(cmnd)
+        cmnd = 'service rsyslog restart >> /dev/null'
+        os.system(cmnd)
+
+    mkdirs(CONFIG_PATH)
+    mkdirs(CONFIG_PATH_OBJ)
+    mkdirs(CONFIG_PATH_CONT)
+    mkdirs(CONFIG_PATH_ACC)
+
+    for cmnd in cmnds:
+        os.system(cmnd)
+
+    fp = open(CONFIG_PATH + '/' + 'proxy-server.conf', "r")
+    data = []
+    while True:
+        line = fp.readline()
+        if not line:
+            break
+        line = line.strip(' ')
+        data.append(line)
+
+    fp.close()
+
+    if sock == 1: ##https
+        create_certificates()
+
+    if sock == 2:##http
+        data = remove_certificates(data)
+
+    data = add_key(data, key)
+    data = add_ip(data, ip)
+
+    if object_port:
+        data = add_object_port(data, object_port)
+        update_object_conf(object_port)
+
+    if container_port:
+        data = add_container_port(data, container_port)
+        update_container_conf(container_port)
+
+    if account_port:
+        data = add_account_port(data, account_port)
+        update_account_conf(account_port)
+
+    fp = open(CONFIG_PATH + '/' + 'proxy-server.conf', "w")
+    for item in data:
+        item = item.strip('\n')
+        fp.write(item + '\n')
+    fp.close()
+

@@ -1,0 +1,6 @@
+include AUTHORS LICENSE .functests .unittests .probetests test/__init__.py
+include ChangeLog
+graft doc  
+graft etc
+graft test/functional
+graft test/probe
