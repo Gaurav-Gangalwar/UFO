@@ -1152,6 +1152,9 @@ def _check_valid_account(account):
                 #return False
             #Check if dir created.    
             mkdirs(os.path.join(MOUNT_PATH, account))
+
+        umnt_cmd = 'umount %s 2>> /dev/null' % os.path.join(MOUNT_PATH, account)
+        os.system(umnt_cmd)
             
         mnt_cmd = 'mount -t glusterfs %s:%s %s/%s' % (MOUNT_IP, account, \
                                                            MOUNT_PATH, account)
