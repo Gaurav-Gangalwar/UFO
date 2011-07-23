@@ -679,7 +679,7 @@ class ObjectController(object):
                     header_caps = header_key.title()
                     metadata[header_caps] = request.headers[header_key]
             if not file_obj.put(fd, tmppath, metadata):
-                HTTPUnprocessableEntity(request=request)
+                return HTTPUnprocessableEntity(request=request)
         #file.unlinkold(metadata['X-Timestamp'])
         self.container_update('PUT', account, container, obj, request.headers,
             {'x-content-length': file_obj.metadata[X_CONTENT_LENGTH],
