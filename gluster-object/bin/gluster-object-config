@@ -18,16 +18,14 @@
 import os
 import socket
 
-RUN_DIR = '/var/run/swift'
+RUN_DIR = '/var/run/gluster-object'
 SYSLOG_DIR = '/etc/rsyslog.d'
 SYSLOG_CONF = '/etc/rsyslog.conf'
 SYSLOG_STR = '$PrivDropToGroup adm'
-LOG_DIR = '/var/log/swift'
-LOG_DIR1 = '/var/log/swift/hourly'
-CONFIG_PATH = '/etc/swift'
-CONFIG_PATH_OBJ = '/etc/swift/object-server'
-CONFIG_PATH_CONT = '/etc/swift/container-server'
-CONFIG_PATH_ACC = '/etc/swift/account-server'
+CONFIG_PATH = '/etc/gluster-object'
+CONFIG_PATH_OBJ = '/etc/gluster-object/object-server'
+CONFIG_PATH_CONT = '/etc/gluster-object/container-server'
+CONFIG_PATH_ACC = '/etc/gluster-object/account-server'
 CONFIG_FILES_PATH = "/usr/local/gluster-object/config"
 
 def mkdirs(path):
@@ -52,14 +50,6 @@ def remove_certificates(data):
 
         tmp_data.append(item)
 
-    """
-    if os.path.exists('/etc/swift/cert.crt'):
-        os.unlink('/etc/swift/cert.crt')
-
-    if os.path.exists('/etc/swift/cert.key'):
-        os.unlink('/etc/swift/cert.key')
-    """
-
     return tmp_data
 
 
@@ -72,7 +62,7 @@ def create_certificates():
         continue
 
     if resp.lower() == 'y':
-        cmnd = 'openssl req -new -x509 -nodes -out /etc/swift/cert.crt -keyout /etc/swift/cert.key'
+        cmnd = 'openssl req -new -x509 -nodes -out %s/cert.crt -keyout %s/cert.key' % (CONFIG_PATH, CONFIG_PATH)
         os.system(cmnd)
 
 def add_key(data, key):
@@ -121,11 +111,11 @@ def add_ip(data, ip):
     ip = ip.strip(' ')
     tmp_data = []
     for item in data:
-        if item.startswith('default_swift_cluster'):
+        if item.startswith('default_gluster_object_cluster'):
             if sock == 1:
-                item = 'default_swift_cluster = local#https://%s:443/v1#https://127.0.0.1:443/v1' % ip
+                item = 'default_gluster_object_cluster = local#https://%s:443/v1#https://127.0.0.1:443/v1' % ip
             else:
-                item = 'default_swift_cluster = local#http://%s:8080/v1#http://127.0.0.1:8080/v1' % ip
+                item = 'default_gluster_object_cluster = local#http://%s:8080/v1#http://127.0.0.1:8080/v1' % ip
 
         tmp_data.append(item)
 
@@ -264,46 +254,14 @@ if __name__ == '__main__':
         break
 
         
-    cmnds = ['cp %s/proxy-server.conf /etc/swift/ >> /dev/null' % CONFIG_FILES_PATH,
-             'cp %s/swift.conf /etc/swift/ >> /dev/null' % CONFIG_FILES_PATH,
-             'cp %s/object-server.conf /etc/swift/object-server/1.conf >> /dev/null' % CONFIG_FILES_PATH,
-             'cp %s/container-server.conf /etc/swift/container-server/1.conf >> /dev/null' % CONFIG_FILES_PATH,
-             'cp %s/account-server.conf /etc/swift/account-server/1.conf >> /dev/null' % CONFIG_FILES_PATH]
+    cmnds = ['cp %s/proxy-server.conf %s/ >> /dev/null' % (CONFIG_FILES_PATH, CONFIG_PATH),
+             'cp %s/gluster-object.conf %s/ >> /dev/null' % (CONFIG_FILES_PATH, CONFIG_PATH),
+             'cp %s/object-server.conf %s/1.conf >> /dev/null' % (CONFIG_FILES_PATH, CONFIG_PATH_OBJ),
+             'cp %s/container-server.conf %s/1.conf >> /dev/null' % (CONFIG_FILES_PATH, CONFIG_PATH_CONT),
+             'cp %s/account-server.conf %s/1.conf >> /dev/null' % (CONFIG_FILES_PATH, CONFIG_PATH_ACC)]
 
 
     mkdirs(RUN_DIR)
-    
-    if os.path.isdir(SYSLOG_DIR):
-        skip_syslog_conf = False
-        cmnd = 'cp %s/10-swift.conf /etc/rsyslog.d/10-swift.conf >> /dev/null' % CONFIG_FILES_PATH
-        if not os.path.exists(SYSLOG_CONF):
-            skip_syslog_conf = True
-        else:
-            fp = open(SYSLOG_CONF, "r")
-            while True:
-                line = fp.readline()
-                if not line:
-                    break
-                if line.startswith('#'):
-                    continue
-                line = line.strip(' ').strip('\n')
-                if line == SYSLOG_STR:
-                    skip_syslog_conf = True
-            fp.close()
-
-        if not skip_syslog_conf:
-            fp = open(SYSLOG_CONF, "a")
-            fp.write('\n' + SYSLOG_STR + '\n')
-            fp.close()
-        
-        os.system(cmnd)
-        mkdirs(LOG_DIR)
-        mkdirs(LOG_DIR1)
-        cmnd = 'chown -R syslog.adm /var/log/swift 2>> /dev/null'
-        os.system(cmnd)
-        cmnd = 'service rsyslog restart >> /dev/null'
-        os.system(cmnd)
-
     mkdirs(CONFIG_PATH)
     mkdirs(CONFIG_PATH_OBJ)
     mkdirs(CONFIG_PATH_CONT)

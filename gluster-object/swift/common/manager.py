@@ -26,8 +26,8 @@ import re
 
 from swift.common.utils import search_tree, remove_file, write_file
 
-SWIFT_DIR = '/etc/swift'
-RUN_DIR = '/var/run/swift'
+SWIFT_DIR = '/etc/gluster-object'
+RUN_DIR = '/var/run/gluster-object'
 
 # auth-server has been removed from ALL_SERVERS, start it explicitly
 ALL_SERVERS = ['account-auditor', 'account-server', 'container-auditor',

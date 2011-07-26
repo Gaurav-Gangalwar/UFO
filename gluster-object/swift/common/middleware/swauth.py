@@ -69,7 +69,7 @@ class Swauth(object):
         #self.auth_account = '%s.auth' % self.reseller_prefix
         self.auth_account = '%s%s' % (self.reseller_prefix, AUTH_ACCOUNT)
         #self.storage_url = conf.get('storage_url', 'http://127.0.0.1:8080/v1') 
-        self.default_swift_cluster = conf.get('default_swift_cluster',
+        self.default_gluster_object_cluster = conf.get('default_gluster_object_cluster',
             'local#http://127.0.0.1:8080/v1')
         # This setting is a little messy because of the options it has to
         # provide. The basic format is cluster_name#url, such as the default
@@ -78,7 +78,7 @@ class Swauth(object):
         # Swauth to create/delete accounts, there's a more complex format:
         # cluster_name#url#url, such as
         # local#https://public.com:8080/v1#http://private.com:8080/v1.
-        cluster_parts = self.default_swift_cluster.split('#', 2)
+        cluster_parts = self.default_gluster_object_cluster.split('#', 2)
         self.dsc_name = cluster_parts[0]
         if len(cluster_parts) == 3:
             self.dsc_url = cluster_parts[1].rstrip('/')

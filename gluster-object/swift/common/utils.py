@@ -89,7 +89,7 @@ RESELLER_PREFIX = 'AUTH_'
 AUTH_ACCOUNT = 'auth'
 REPLICA_COUNT = 1
 
-MOUNT_PATH = '/mnt/swift'
+MOUNT_PATH = '/mnt/gluster-object'
 MOUNT_IP = 'localhost'
 
 OBJECT = 'Object'
@@ -115,7 +115,7 @@ _posix_fadvise = None
 # will end up with would also require knowing this suffix.
 hash_conf = ConfigParser()
 HASH_PATH_SUFFIX = ''
-if hash_conf.read('/etc/swift/swift.conf'):
+if hash_conf.read('/etc/gluster-object/gluster-object.conf'):
     try:
         HASH_PATH_SUFFIX = hash_conf.get('swift-hash',
                                          'swift_hash_path_suffix')
@@ -129,7 +129,7 @@ TRUE_VALUES = set(('true', '1', 'yes', 'True', 'Yes', 'on', 'On', 't', 'y'))
 def validate_configuration():
     if HASH_PATH_SUFFIX == '':
         sys.exit("Error: [swift-hash]: swift_hash_path_suffix missing "
-                 "from /etc/swift/swift.conf")
+                 "from /etc/gluster-object/gluster-object.conf")
 
 
 def load_libc_function(func_name):
@@ -470,7 +470,7 @@ def get_logger(conf, name=None, log_to_console=False, log_route=None,
     if not conf:
         conf = {}
     if name is None:
-        name = conf.get('log_name', 'swift')
+        name = conf.get('log_name', 'gluster-object')
     if not log_route:
         log_route = name
     logger = logging.getLogger(log_route)
@@ -485,8 +485,9 @@ def get_logger(conf, name=None, log_to_console=False, log_route=None,
         logger.removeHandler(get_logger.handler4logger[logger])
 
     # facility for this logger will be set by last call wins
-    facility = getattr(SysLogHandler, conf.get('log_facility', 'LOG_LOCAL0'),
-                       SysLogHandler.LOG_LOCAL0)
+    #facility = getattr(SysLogHandler, conf.get('log_facility', 'LOG_LOCAL0'),
+                       #SysLogHandler.LOG_LOCAL0)
+    facility = SysLogHandler.LOG_LOCAL0
     handler = SysLogHandler(address='/dev/log', facility=facility)
     handler.setFormatter(formatter)
     logger.addHandler(handler)

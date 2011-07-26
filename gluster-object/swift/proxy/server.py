@@ -1451,7 +1451,7 @@ class BaseApplication(object):
         else:
             self.logger = self.access_logger = logger
 
-        swift_dir = conf.get('swift_dir', '/etc/swift')
+        gluster_object_dir = conf.get('gluster_object_dir', '/etc/gluster-object')
         self.object_port = int(conf.get('object_port', 6010))
         self.container_port = int(conf.get('container_port', 6011))
         self.account_port = int(conf.get('account_port', 6012))
@@ -1473,7 +1473,7 @@ class BaseApplication(object):
         self.allow_account_management = \
             conf.get('allow_account_management', 'false').lower() == 'true'
         self.resellers_conf = ConfigParser()
-        self.resellers_conf.read(os.path.join(swift_dir, 'resellers.conf'))
+        self.resellers_conf.read(os.path.join(gluster_object_dir, 'resellers.conf'))
         #self.object_ring = object_ring or \
             #Ring(os.path.join(swift_dir, 'object.ring.gz'))
         #self.container_ring = container_ring or \
@@ -1482,7 +1482,7 @@ class BaseApplication(object):
             #Ring(os.path.join(swift_dir, 'account.ring.gz'))
         self.memcache = memcache
         mimetypes.init(mimetypes.knownfiles +
-                       [os.path.join(swift_dir, 'mime.types')])
+                       [os.path.join(gluster_object_dir, 'mime.types')])
 
     def get_controller(self, path):
         """
