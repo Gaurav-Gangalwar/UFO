@@ -1,0 +1,17 @@
+Gluster-Object is the "Unified File and Object Store", which we can use to
+access objects as files and files as objects on the glusterfs volume.
+
+To use this you should have glusterfs installed.
+
+Steps to start gluster-object:->
+1>goto UFO directory.
+2>Run sh <ubuntu/centos/ssa>_install.sh as per your distribution.
+3>Provide all the config parameters.
+
+At the completion of <..>_install.sh, gluster-object servers should be running on
+your system.
+
+It should start proxy, object, container and account servers, verify by ps -ef.
+
+Refer to doc section for user guide.
+
