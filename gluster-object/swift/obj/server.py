@@ -47,7 +47,6 @@ from swift.common.constraints import check_object_creation, check_mount, \
     check_float, check_utf8
 from swift.common.exceptions import ConnectionTimeout, DiskFileError, \
     DiskFileNotExist
-#from swift.obj.replicator import tpooled_get_hashes, invalidate_hash
 from swift.common.utils import X_CONTENT_TYPE, X_CONTENT_LENGTH, X_TIMESTAMP,\
      X_PUT_TIMESTAMP, X_TYPE, X_ETAG, X_OBJECTS_COUNT, X_BYTES_USED, \
      X_OBJECT_TYPE, FILE, DIR, MARKER_DIR, MOUNT_PATH, OBJECT, \
@@ -79,7 +78,6 @@ def quarantine_renamer(device_path, corrupted_file_path):
     from_dir = os.path.dirname(corrupted_file_path)
     to_dir = os.path.join(device_path, 'quarantined',
                           'objects', os.path.basename(from_dir))
-    #invalidate_hash(os.path.dirname(from_dir))
     try:
         renamer(from_dir, to_dir)
     except OSError, e:
@@ -115,16 +113,15 @@ class DiskFile(object):
         else:
             self.obj_path = ''
             self.obj = obj
-        #self.name = '/'.join((account, container, self.obj_path))
+        
         if self.obj_path:
             self.name = '/'.join((container, self.obj_path))
         else:
             self.name = container
-        #name_hash = hash_path(account, container, obj)
+        
         self.datadir = os.path.join(path, device,
                     storage_directory(DATADIR, partition, self.name))
-        #print 'Gaurav Diskfile datadir', account, container, obj, path,\
-                                         #device, self.datadir
+        
         self.device_path = os.path.join(path, device)
         self.container_path = os.path.join(path, device, container)
         self.tmpdir = os.path.join(path, device, 'tmp')
@@ -144,13 +141,10 @@ class DiskFile(object):
         self.gid = int(gid)
         if not os.path.exists(self.datadir + '/' + self.obj):
             return
-        #TODO: marker objects.
-        
+                
         self.data_file = os.path.join(self.datadir, self.obj)
         self.metadata = read_metadata(self.datadir + '/' + self.obj)
         if not self.metadata:
-            #self.metadata = get_object_details(self.datadir + '/' + self.obj)
-            #self.update_object(self.metadata)
             create_object_metadata(self.datadir + '/' + self.obj)
             self.metadata = read_metadata(self.datadir + '/' + self.obj)
         if not validate_object(self.metadata):
@@ -342,9 +336,6 @@ class DiskFile(object):
                     if not self.create_dir_object(tmp_path, metadata[X_TIMESTAMP]):
                         return False
                                        
-        #print 'Gaurav put tmppath', tmppath, os.path.join(self.datadir,
-                                                          #self.obj+extension)
-        #invalidate_hash(os.path.dirname(self.datadir))
         renamer(tmppath, os.path.join(self.datadir,
                                       self.obj + extension))
         os.chown(os.path.join(self.datadir, self.obj + extension), \
@@ -382,7 +373,6 @@ class DiskFile(object):
                 self.data_file = None
             return
         for fname in os.listdir(self.datadir):
-            #name, ext = fname.rsplit('.', 1)
             if fname == self.obj:
                 try:
                     os.unlink(os.path.join(self.datadir, fname))
@@ -398,7 +388,6 @@ class DiskFile(object):
                     #TODO: Check dir is empty (Done in rmdirs)
                     dir_path = os.path.join(self.container_path, tmp_path)
                     metadata = read_metadata(dir_path)
-                    #if metadata[X_OBJECT_TYPE] == DIR:
                     rmdirs(dir_path)
                     if '/' in tmp_path:
                         tmp_path = tmp_path.rsplit('/', 1)[0]
@@ -449,8 +438,7 @@ class DiskFile(object):
                     if file_size != metadata_size:
                         self.metadata[X_CONTENT_LENGTH] = file_size
                         self.update_object(self.metadata)
-                        #raise DiskFileError('Content-Length of %s does not '
-                          #'match file size of %s' % (metadata_size, file_size))
+                        
                 return file_size
         except OSError, err:
             if err.errno != errno.ENOENT:
@@ -474,7 +462,6 @@ class ObjectController(object):
         /etc/swift/object-server.conf-sample.
         """
         self.logger = get_logger(conf, log_route='object-server')
-        #self.devices = conf.get('devices', '/srv/node/')
         self.devices = MOUNT_PATH
         self.mount_check = conf.get('mount_check', 'true').lower() in \
                               ('true', 't', '1', 'on', 'yes', 'y')
@@ -569,12 +556,10 @@ class ObjectController(object):
             file_size = file_obj.get_data_file_size()
         except (DiskFileError, DiskFileNotExist):
             #TODO: What to do?
-            #file.quarantine()
             return HTTPNotFound(request=request)
         metadata = file_obj.metadata
         metadata[X_TIMESTAMP] = request.headers['x-timestamp']
-        #metadata.update(val for val in request.headers.iteritems()
-                #if val[0].lower().startswith('x-object-meta-'))
+        
         metadata.update((key, value)
             for key, value in request.headers.iteritems()
             if key.lower().startswith('x-object-meta-'))
@@ -582,7 +567,7 @@ class ObjectController(object):
             if header_key in request.headers:
                 header_caps = header_key.title()
                 metadata[header_caps] = request.headers[header_key]
-        #with file_obj.mkstemp() as (fd, tmppath):
+        
         file_obj.put_metadata(metadata)
         return response_class(request=request)
 
@@ -604,8 +589,6 @@ class ObjectController(object):
         error_response = check_object_creation(request, obj)
         if error_response:
             return error_response
-        
-        #print 'PUT req', request.headers
         
         file_obj = DiskFile(self.devices, device, partition, account, container,
                             obj, self.logger, disk_chunk_size=self.disk_chunk_size, \
@@ -680,7 +663,7 @@ class ObjectController(object):
                     metadata[header_caps] = request.headers[header_key]
             if not file_obj.put(fd, tmppath, metadata):
                 return HTTPUnprocessableEntity(request=request)
-        #file.unlinkold(metadata['X-Timestamp'])
+        
         self.container_update('PUT', account, container, obj, request.headers,
             {'x-content-length': file_obj.metadata[X_CONTENT_LENGTH],
              'x-content-type': file_obj.metadata[X_CONTENT_TYPE],
@@ -721,7 +704,6 @@ class ObjectController(object):
         try:
             file_size = file_obj.get_data_file_size()
         except (DiskFileError, DiskFileNotExist):
-            #file.quarantine()
             #TODO: What to do?
             file_obj.close()
             return HTTPNotFound(request=request)
@@ -812,7 +794,6 @@ class ObjectController(object):
         try:
             file_size = file_obj.get_data_file_size()
         except (DiskFileError, DiskFileNotExist):
-            #file.quarantine()
             #TODO: What to do?
             return HTTPNotFound(request=request)
         response = Response(content_type=file_obj.metadata[X_CONTENT_TYPE],
@@ -824,7 +805,6 @@ class ObjectController(object):
         response.etag = file_obj.metadata[X_ETAG]
         response.last_modified = float(file_obj.metadata[X_TIMESTAMP])
         response.content_length = file_size
-        #response.content_length = 0
         if 'Content-Encoding' in file_obj.metadata:
             response.content_encoding = file_obj.metadata['Content-Encoding']
         return response

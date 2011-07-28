@@ -129,13 +129,23 @@ def canonical_string(req):
     """
     Canonicalize a request to a token that can be signed.
     """
+    amz_headers = {}
+
     buf = "%s\n%s\n%s\n" % (req.method, req.headers.get('Content-MD5', ''),
             req.headers.get('Content-Type') or '')
-    if 'Date' in req.headers:
-        buf += "%s\n" % req.headers['Date']
+
     for amz_header in sorted((key.lower() for key in req.headers
                               if key.lower().startswith('x-amz-'))):
-        buf += "%s:%s\n" % (amz_header, req.headers[amz_header])
+        amz_headers[amz_header] = req.headers[amz_header]
+
+    if 'x-amz-date' in amz_headers:
+        buf += "\n"
+    elif 'Date' in req.headers:
+        buf += "%s\n" % req.headers['Date']
+
+    for k in sorted(key.lower() for key in amz_headers):
+        buf += "%s:%s\n" % (k, amz_headers[k])
+
     path = req.path_qs
     if '?' in path:
         path, args = path.split('?', 1)
@@ -191,7 +201,6 @@ class ServiceController(Controller):
                          '2009-02-03T16:45:09.000Z</CreationDate></Bucket>' %
                          xml_escape(i['name']) for i in containers]))
         resp = Response(status=200, content_type='application/xml', body=body)
-        #print 'Swift3 ', resp
         return resp
 
 
@@ -348,7 +357,6 @@ class ObjectController(Controller):
                 elif _key in ('content-length', 'content-type',
                              'content-encoding', 'etag', 'last-modified'):
                     new_hdrs[key] = val
-            #print 'S3 GET_obj resp_hdr', new_hdrs
             return Response(status=status, headers=new_hdrs, app_iter=app_iter)
         elif status == 401:
             return get_err_response('AccessDenied')
@@ -393,8 +401,6 @@ class ObjectController(Controller):
                 return get_err_response('InvalidBucketName')
             else:
                 return get_err_response('InvalidURI')
-
-        #print 'S3 PUT_obj resp_hdr', headers
 
         if 'HTTP_X_COPY_FROM' in env:
             body = '<CopyObjectResult>' \
