@@ -669,7 +669,7 @@ class ObjectController(object):
              'x-content-type': file_obj.metadata[X_CONTENT_TYPE],
              'x-timestamp': file_obj.metadata[X_TIMESTAMP],
              'x-etag': file_obj.metadata[X_ETAG],
-             'x-cf-trans-id': request.headers.get('x-cf-trans-id', '-')},
+             'x-trans-id': request.headers.get('x-trans-id', '-')},
             device)
         resp = HTTPCreated(request=request, etag=etag)
         return resp
@@ -848,7 +848,7 @@ class ObjectController(object):
         self.container_update('DELETE', account, container, obj,
             request.headers, {'x-timestamp': metadata[X_TIMESTAMP],
             'x-content-length': metadata[X_CONTENT_LENGTH],
-            'x-cf-trans-id': request.headers.get('x-cf-trans-id', '-')},
+            'x-trans-id': request.headers.get('x-trans-id', '-')},
             device)
         resp = response_class(request=request)
         return resp
@@ -862,7 +862,7 @@ class ObjectController(object):
         """WSGI Application entry point for the Swift Object Server."""
         start_time = time.time()
         req = Request(env)
-        self.logger.txn_id = req.headers.get('x-cf-trans-id', None)
+        self.logger.txn_id = req.headers.get('x-trans-id', None)
         if not check_utf8(req.path_info):
             res = HTTPPreconditionFailed(body='Invalid UTF8')
         else:
@@ -883,7 +883,7 @@ class ObjectController(object):
                               time.gmtime()),
                 req.method, req.path, res.status.split()[0],
                 res.content_length or '-', req.referer or '-',
-                req.headers.get('x-cf-trans-id', '-'),
+                req.headers.get('x-trans-id', '-'),
                 req.user_agent or '-',
                 trans_time)
             if req.method == 'REPLICATE':

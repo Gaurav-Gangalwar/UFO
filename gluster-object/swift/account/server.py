@@ -31,7 +31,8 @@ import simplejson
 #from swift.common.db import AccountBroker
 from swift.common.utils import get_logger, get_param, hash_path, \
     normalize_timestamp, split_path, storage_directory, read_metadata, \
-    write_metadata, dir_empty, mkdirs, rmdirs, check_valid_account
+    write_metadata, dir_empty, mkdirs, rmdirs, check_valid_account, \
+    XML_EXTRA_ENTITIES
 from swift.common.constraints import ACCOUNT_LISTING_LIMIT, \
     check_mount, check_float, check_utf8
 #from swift.common.db_replicator import ReplicatorRpc
@@ -97,6 +98,9 @@ class AccountController(object):
         try:
             drive, part, account, container = split_path(unquote(req.path),
                                                          3, 4)
+            if (account and not check_utf8(account)) or \
+                (container and not check_utf8(container)):
+                raise ValueError('NULL characters not allowed in names')
         except ValueError, err:
             return HTTPBadRequest(body=str(err), content_type='text/plain',
                                   request=req)
@@ -206,8 +210,8 @@ class AccountController(object):
             marker = get_param(req, 'marker', '')
             end_marker = get_param(req, 'end_marker')
             query_format = get_param(req, 'format')
-        except UnicodeDecodeError, err:
-            return HTTPBadRequest(body='parameters not utf8',
+        except (UnicodeDecodeError, ValueError), err:
+            return HTTPBadRequest(body='parameters not utf8 or contain NULLs',
                                   content_type='text/plain', request=req)
         if query_format:
             req.accept = 'application/%s' % query_format.lower()
@@ -231,10 +235,10 @@ class AccountController(object):
                         (name, object_count, bytes_used))
             account_list = '[' + ','.join(json_out) + ']'
         elif out_content_type.endswith('/xml'):
-            output_list = ['<?xml version="1.0" encoding="UTF-8"?>',
+            output_list = ['<?xml version="1.1" encoding="UTF-8"?>',
                            '<account name="%s">' % account]
             for (name, object_count, bytes_used, is_subdir) in account_list:
-                name = saxutils.escape(name)
+                name = saxutils.escape(name, XML_EXTRA_ENTITIES)
                 if is_subdir:
                     output_list.append('<subdir name="%s" />' % name)
                 else:
@@ -264,7 +268,7 @@ class AccountController(object):
         ret = Response(body=account_list, request=req, headers=resp_headers)
         ret.content_type = out_content_type
         #print 'S3', ret.content_type, out_content_type
-        ret.charset = 'utf8'
+        ret.charset = 'utf-8'
         return ret
 
     def REPLICATE(self, req):
@@ -301,7 +305,7 @@ class AccountController(object):
     def __call__(self, env, start_response):
         start_time = time.time()
         req = Request(env)
-        self.logger.txn_id = req.headers.get('x-cf-trans-id', None)
+        self.logger.txn_id = req.headers.get('x-trans-id', None)
         if not check_utf8(req.path_info):
             res = HTTPPreconditionFailed(body='Invalid UTF8')
         else:
@@ -324,7 +328,7 @@ class AccountController(object):
             time.strftime('%d/%b/%Y:%H:%M:%S +0000', time.gmtime()),
             req.method, req.path,
             res.status.split()[0], res.content_length or '-',
-            req.headers.get('x-cf-trans-id', '-'),
+            req.headers.get('x-trans-id', '-'),
             req.referer or '-', req.user_agent or '-',
             trans_time,
             additional_info)

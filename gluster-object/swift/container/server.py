@@ -37,7 +37,7 @@ from swift.common.utils import get_logger, get_param, hash_path, \
     write_metadata, clean_metadata, dir_empty, mkdirs, rmdirs, validate_account, \
     validate_container, validate_object, check_valid_account, is_marker, \
     get_container_details, get_account_details, create_container_metadata, \
-    create_account_metadata
+    create_account_metadata, XML_EXTRA_ENTITIES
 from swift.common.constraints import CONTAINER_LISTING_LIMIT, \
     check_mount, check_float, check_utf8
 from swift.common.bufferedhttp import http_connect
@@ -426,6 +426,7 @@ class ContainerController(object):
     """WSGI Controller for the container server."""
 
     # Ensure these are all lowercase
+    #We don't support 'x-container-sync-key' and 'x-container-sync-to'.
     save_headers = ['x-container-read', 'x-container-write']
 
     def __init__(self, conf):
@@ -461,7 +462,7 @@ class ContainerController(object):
                 'x-timestamp': dir_obj.metadata[X_TIMESTAMP],
                 'x-object-count': dir_obj.metadata[X_OBJECTS_COUNT],
                 'x-bytes-used': dir_obj.metadata[X_BYTES_USED],
-                'x-cf-trans-id': req.headers.get('X-Cf-Trans-Id', '-')}
+                'x-trans-id': req.headers.get('x-trans-id', '-')}
             if req.headers.get('x-account-override-deleted', 'no').lower() == \
                     'yes':
                 account_headers['x-account-override-deleted'] = 'yes'
@@ -535,6 +536,10 @@ class ContainerController(object):
         try:
             drive, part, account, container, obj = split_path(
                 unquote(req.path), 4, 5, True)
+            if (account and not check_utf8(account)) or \
+                (container and not check_utf8(container)) or \
+                (obj and not check_utf8(obj)):
+                raise ValueError('NULL characters not allowed in names')
         except ValueError, err:
             return HTTPBadRequest(body=str(err), content_type='text/plain',
                                 request=req)
@@ -653,8 +658,8 @@ class ContainerController(object):
                     return HTTPPreconditionFailed(request=req,
                         body='Maximum limit is %d' % CONTAINER_LISTING_LIMIT)
             query_format = get_param(req, 'format')
-        except UnicodeDecodeError, err:
-            return HTTPBadRequest(body='parameters not utf8',
+        except (UnicodeDecodeError, ValueError), err:
+            return HTTPBadRequest(body='parameters not utf8 or contain NULLs',
                                   content_type='text/plain', request=req)
         if query_format:
             req.accept = 'application/%s' % query_format.lower()
@@ -688,20 +693,23 @@ class ContainerController(object):
             xml_output = []
             for (name, created_at, size, content_type, etag) in container_list:
                 # escape name and format date here
-                name = saxutils.escape(name)
+                name = saxutils.escape(name, XML_EXTRA_ENTITIES)
                 created_at = datetime.utcfromtimestamp(
                     float(created_at)).isoformat()
                 if content_type is None:
-                    xml_output.append('<subdir name="%s" />' % name)
+                    xml_output.append('<subdir name="%s"><name>%s</name>'
+                                      '</subdir>' % (name, name))
                 else:
-                    content_type = saxutils.escape(content_type)
+                    content_type = saxutils.escape(content_type,
+                                                   XML_EXTRA_ENTITIES)
                     xml_output.append('<object><name>%s</name><hash>%s</hash>'\
                            '<bytes>%d</bytes><content_type>%s</content_type>'\
                            '<last_modified>%s</last_modified></object>' % \
                            (name, etag, int(size), content_type, created_at))
             container_list = ''.join([
-                '<?xml version="1.0" encoding="UTF-8"?>\n',
-                '<container name=%s>' % saxutils.quoteattr(container),
+                '<?xml version="1.1" encoding="UTF-8"?>\n',
+                '<container name=%s>' % 
+                    saxutils.quoteattr(container, XML_EXTRA_ENTITIES),
                 ''.join(xml_output), '</container>'])
         else:
             if container_list:
@@ -722,7 +730,7 @@ class ContainerController(object):
         
         ret = Response(body=container_list, request=req, headers=resp_headers)
         ret.content_type = out_content_type
-        ret.charset = 'utf8'
+        ret.charset = 'utf-8'
         return ret
 
     def REPLICATE(self, req):
@@ -761,7 +769,7 @@ class ContainerController(object):
     def __call__(self, env, start_response):
         start_time = time.time()
         req = Request(env)
-        self.logger.txn_id = req.headers.get('x-cf-trans-id', None)
+        self.logger.txn_id = req.headers.get('x-trans-id', None)
         if not check_utf8(req.path_info):
             res = HTTPPreconditionFailed(body='Invalid UTF8')
         else:
@@ -781,7 +789,7 @@ class ContainerController(object):
                           time.gmtime()),
             req.method, req.path,
             res.status.split()[0], res.content_length or '-',
-            req.headers.get('x-cf-trans-id', '-'),
+            req.headers.get('x-trans-id', '-'),
             req.referer or '-', req.user_agent or '-',
             trans_time)
         if req.method.upper() == 'REPLICATE':
