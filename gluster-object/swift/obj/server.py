@@ -708,11 +708,11 @@ class ObjectController(object):
             file_obj.close()
             return HTTPNotFound(request=request)
         if request.headers.get('if-match') not in (None, '*') and \
-                file_obj.metadata[X-ETAG] not in request.if_match:
+                file_obj.metadata[X_ETAG] not in request.if_match:
             file_obj.close()
             return HTTPPreconditionFailed(request=request)
         if request.headers.get('if-none-match') != None:
-            if file_obj.metadata[X-ETAG] in request.if_none_match:
+            if file_obj.metadata[X_ETAG] in request.if_none_match:
                 resp = HTTPNotModified(request=request)
                 resp.etag = file_obj.metadata[X_ETAG]
                 file_obj.close()
