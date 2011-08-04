@@ -39,6 +39,7 @@ from swift.common.middleware.acl import clean_acl, parse_acl, referrer_allowed
 from swift.common.utils import cache_from_env, get_logger, \
      split_path, urlparse, get_account_list, check_account_exists
 from swift.common.utils import RESELLER_PREFIX, AUTH_ACCOUNT, DEFAULT_UID, DEFAULT_GID
+import swift.common.authtypes
 
 
 class Swauth(object):
@@ -107,6 +108,15 @@ class Swauth(object):
         self.timeout = int(conf.get('node_timeout', 10))
         self.itoken = None
         self.itoken_expires = None
+        # Get an instance of our auth_type encoder for saving and checking the
+        # user's key
+        self.auth_type = conf.get('auth_type', 'Plaintext').title()
+        self.auth_encoder = getattr(swift.common.authtypes, self.auth_type, None)
+        if self.auth_encoder is None:
+            raise Exception('Invalid auth_type in config file: %s'
+                             % self.auth_type)
+        self.auth_encoder.salt = conf.get('auth_type_salt', 'swauthsalt')
+
 
     def __call__(self, env, start_response):
         """
@@ -941,8 +951,9 @@ class Swauth(object):
             groups.append('.admin')
         if reseller_admin:
             groups.append('.reseller_admin')
+        auth_value = self.auth_encoder().encode(key)
         resp = self.make_request(req.environ, 'PUT', path,
-            json.dumps({'auth': 'plaintext:%s' % key,
+            json.dumps({'auth': auth_value,
                         'uid': uid,
                         'gid': gid,
                         'groups': [{'name': g} for g in groups]}),
@@ -1385,14 +1396,15 @@ class Swauth(object):
 
     def credentials_match(self, user_detail, key):
         """
-        Returns True if the key is valid for the user_detail. Currently, this
-        only supports plaintext key matching.
+        Returns True if the key is valid for the user_detail.
+        It will use self.auth_encoder to check for a key match.
 
         :param user_detail: The dict for the user.
         :param key: The key to validate for the user.
         :returns: True if the key is valid for the user, False if not.
         """
-        return user_detail and user_detail.get('auth') == 'plaintext:%s' % key
+        return user_detail and self.auth_encoder().match(
+          key, user_detail.get('auth'))
 
     def is_super_admin(self, req):
         """
