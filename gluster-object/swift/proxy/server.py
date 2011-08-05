@@ -53,6 +53,7 @@ from swift.common.exceptions import ChunkReadTimeout, \
 from swift.common.utils import get_device_from_account
 from swift.common.utils import REPLICA_COUNT, DEFAULT_UID, DEFAULT_GID, global_headers, \
      OBJECT_SERVER_IP, CONTAINER_SERVER_IP, ACCOUNT_SERVER_IP
+from swift import plugins
 
 def update_headers(response, headers):
     """
@@ -1472,8 +1473,15 @@ class BaseApplication(object):
             int(conf.get('recheck_account_existence', 60))
         self.allow_account_management = \
             conf.get('allow_account_management', 'false').lower() == 'true'
+        self.fs_name = conf.get('fs_name', 'Glusterfs')
+        self.fs_object = getattr(plugins, self.fs_name, False)
+        if not self.fs_object:
+            raise Exception('Invalid Filesystem name %s', self.fs_name)
+        self.fs_object = self.fs_object()
+        
         self.resellers_conf = ConfigParser()
         self.resellers_conf.read(os.path.join(gluster_object_dir, 'resellers.conf'))
+        
         #self.object_ring = object_ring or \
             #Ring(os.path.join(swift_dir, 'object.ring.gz'))
         #self.container_ring = container_ring or \

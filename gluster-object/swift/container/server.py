@@ -37,7 +37,7 @@ from swift.common.utils import get_logger, get_param, hash_path, \
     write_metadata, clean_metadata, dir_empty, mkdirs, rmdirs, validate_account, \
     validate_container, validate_object, check_valid_account, is_marker, \
     get_container_details, get_account_details, create_container_metadata, \
-    create_account_metadata, XML_EXTRA_ENTITIES
+    create_account_metadata, get_device_from_account
 from swift.common.constraints import CONTAINER_LISTING_LIMIT, \
     check_mount, check_float, check_utf8
 from swift.common.bufferedhttp import http_connect
@@ -45,8 +45,9 @@ from swift.common.exceptions import ConnectionTimeout
 #from swift.common.db_replicator import ReplicatorRpc
 from swift.common.utils import X_CONTENT_TYPE, X_CONTENT_LENGTH, X_TIMESTAMP,\
      X_PUT_TIMESTAMP, X_TYPE, X_ETAG, X_OBJECTS_COUNT, X_BYTES_USED, \
-     X_CONTAINER_COUNT, MOUNT_PATH, CONTAINER, RESELLER_PREFIX, DEFAULT_UID, \
-     DEFAULT_GID
+     X_CONTAINER_COUNT, CONTAINER, DEFAULT_UID, \
+     DEFAULT_GID, XML_EXTRA_ENTITIES
+from swift import plugins
 
 DATADIR = 'containers'
 
@@ -67,7 +68,6 @@ class DiskDir(object):
 
     def __init__(self, path, device, partition, account, container, logger, uid=DEFAULT_UID, gid=DEFAULT_GID):
         if container:
-            #self.name = '/'.join((account, container))
             self.name = container
         else:
             self.name = None
@@ -77,8 +77,7 @@ class DiskDir(object):
         else:
             self.datadir = os.path.join(path, device)
             
-        #print 'Gaurav DiskDir datadir', account, container, path,\
-                                         #device, self.datadir
+        
         self.device_path = os.path.join(path, device)
         self.logger = logger
         self.metadata = {}
@@ -91,15 +90,11 @@ class DiskDir(object):
             return
         if container:
             if not self.metadata:
-                #objects, object_count, bytes_used = get_container_details(self.datadir)
-                #self.update_container(object_count, bytes_used)
                 create_container_metadata(self.datadir)
                 self.metadata = read_metadata(self.datadir)
             ret = validate_container(self.metadata)
         else:
             if not self.metadata:
-                #containers, container_count = get_account_details(self.datadir)
-                #self.update_acocunt(container_count)
                 create_account_metadata(self.datadir)
                 self.metadata = read_metadata(self.datadir)
             ret = validate_account(self.metadata)
@@ -174,9 +169,6 @@ class DiskDir(object):
         """
         For account server.
         """
-        #print 'Gaurav put_container', int(self.metadata[X_OBJECTS_COUNT]) + int(object_count)
-        #self.metadata[X_OBJECTS_COUNT] = int(self.metadata[X_OBJECTS_COUNT]) + int(object_count)
-        #self.metadata[X_BYTES_USED] = int(self.metadata[X_BYTES_USED]) + int(bytes_used)
         self.metadata[X_OBJECTS_COUNT] = 0
         self.metadata[X_BYTES_USED] = 0
         self.metadata[X_CONTAINER_COUNT] = int(self.metadata[X_CONTAINER_COUNT]) + 1
@@ -187,8 +179,6 @@ class DiskDir(object):
         """
         For account server.
         """
-        #self.metadata[X_OBJECTS_COUNT] = int(self.metadata[X_OBJECTS_COUNT]) - int(object_count)
-        #self.metadata[X_BYTES_USED] = int(self.metadata[X_BYTES_USED]) - int(bytes_used)
         self.metadata[X_OBJECTS_COUNT] = 0
         self.metadata[X_BYTES_USED] = 0
         self.metadata[X_CONTAINER_COUNT] = int(self.metadata[X_CONTAINER_COUNT]) - 1
@@ -431,8 +421,12 @@ class ContainerController(object):
 
     def __init__(self, conf):
         self.logger = get_logger(conf, log_route='container-server')
-        #self.root = conf.get('devices', '/srv/node/')
-        self.root = MOUNT_PATH
+        self.fs_name = conf.get('fs_name', 'Glusterfs')
+        self.fs_object = getattr(plugins, self.fs_name, False)
+        if not self.fs_object:
+            raise Exception('Invalid Filesystem name %s', self.fs_name)
+        self.fs_object = self.fs_object()
+        self.root = self.fs_object.mount_path
         self.mount_check = conf.get('mount_check', 'true').lower() in \
                               ('true', 't', '1', 'on', 'yes', 'y')
         self.node_timeout = int(conf.get('node_timeout', 3))
@@ -505,7 +499,7 @@ class ContainerController(object):
             return HTTPBadRequest(body='Missing timestamp', request=req,
                         content_type='text/plain')
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(account.replace(RESELLER_PREFIX, '', 1)):
+            if not check_valid_account(get_device_from_account(account), self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         #broker = self._get_container_broker(drive, part, account, container)
         dir_obj = DiskDir(self.root, drive, part, account, container, self.logger)
@@ -548,7 +542,7 @@ class ContainerController(object):
             return HTTPBadRequest(body='Missing timestamp', request=req,
                         content_type='text/plain')
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(account.replace(RESELLER_PREFIX, '', 1)):
+            if not check_valid_account(get_device_from_account(account), self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         timestamp = normalize_timestamp(req.headers['x-timestamp'])
         #TODO: Store this timestamp as created time if container doesn't exists.
@@ -603,7 +597,7 @@ class ContainerController(object):
             return HTTPBadRequest(body=str(err), content_type='text/plain',
                                 request=req)
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(account.replace(RESELLER_PREFIX, '', 1)):
+            if not check_valid_account(get_device_from_account(account), self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         
         dir_obj = DiskDir(self.root, drive, part, account, container, self.logger)
@@ -633,7 +627,7 @@ class ContainerController(object):
             return HTTPBadRequest(body=str(err), content_type='text/plain',
                                 request=req)
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(account.replace(RESELLER_PREFIX, '', 1)):
+            if not check_valid_account(get_device_from_account(account), self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         
         dir_obj = DiskDir(self.root, drive, part, account, container, self.logger)
@@ -750,7 +744,7 @@ class ContainerController(object):
             return HTTPBadRequest(body='Missing or bad timestamp',
                 request=req, content_type='text/plain')
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(account.replace(RESELLER_PREFIX, '', 1)):
+            if not check_valid_account(get_device_from_account(account), self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         dir_obj = DiskDir(self.root, drive, part, account, container, self.logger)
         if not dir_obj.dir_exists:

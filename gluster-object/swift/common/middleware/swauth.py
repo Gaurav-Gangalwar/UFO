@@ -40,6 +40,7 @@ from swift.common.utils import cache_from_env, get_logger, \
      split_path, urlparse, get_account_list, check_account_exists
 from swift.common.utils import RESELLER_PREFIX, AUTH_ACCOUNT, DEFAULT_UID, DEFAULT_GID
 import swift.common.authtypes
+from swift import plugins
 
 
 class Swauth(object):
@@ -72,6 +73,11 @@ class Swauth(object):
         #self.storage_url = conf.get('storage_url', 'http://127.0.0.1:8080/v1') 
         self.default_gluster_object_cluster = conf.get('default_gluster_object_cluster',
             'local#http://127.0.0.1:8080/v1')
+        self.fs_name = conf.get('fs_name', 'Glusterfs')
+        self.fs_object = getattr(plugins, self.fs_name, False)
+        if not self.fs_object:
+            raise Exception('Invalid Filesystem name %s', self.fs_name)
+        self.fs_object = self.fs_object()
         # This setting is a little messy because of the options it has to
         # provide. The basic format is cluster_name#url, such as the default
         # value of local#http://127.0.0.1:8080/v1.
@@ -432,7 +438,7 @@ class Swauth(object):
         :param req: The webob.Request to process.
         :returns: webob.Response, 204 on success
         """
-        if not check_account_exists(AUTH_ACCOUNT):
+        if not check_account_exists(AUTH_ACCOUNT, self.fs_object):
             return HTTPNotFound(request=req)
              
         if not self.is_super_admin(req):
@@ -479,7 +485,7 @@ class Swauth(object):
             return HTTPForbidden(request=req)
         listing = []
         
-        for acc_name in get_account_list():
+        for acc_name in get_account_list(self.fs_object):
             listing.append({'name': acc_name})
         return Response(body=json.dumps({'accounts': listing}))
 
@@ -505,7 +511,7 @@ class Swauth(object):
                   explained above.
         """
         account = req.path_info_pop()
-        if not check_account_exists(account):
+        if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
         if req.path_info or not account or account == AUTH_ACCOUNT:
             return HTTPBadRequest(request=req)
@@ -581,7 +587,7 @@ class Swauth(object):
             return HTTPForbidden(request=req)
         account = req.path_info_pop()
         
-        if not check_account_exists(account):
+        if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
         
         if req.path_info != '/.services' or not account or account == AUTH_ACCOUNT:
@@ -626,7 +632,7 @@ class Swauth(object):
             return HTTPForbidden(request=req)
         account = req.path_info_pop()
         
-        if not check_account_exists(account):
+        if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
         
         if req.path_info or not account or account == AUTH_ACCOUNT:
@@ -723,7 +729,7 @@ class Swauth(object):
             return HTTPForbidden(request=req)
         account = req.path_info_pop()
 
-        if not check_account_exists(account):
+        if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
         
         if req.path_info or not account or account == AUTH_ACCOUNT:
@@ -833,7 +839,7 @@ class Swauth(object):
         """
         account = req.path_info_pop()
 
-        if not check_account_exists(account):
+        if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
         
         user = req.path_info_pop()
@@ -921,7 +927,7 @@ class Swauth(object):
         if reseller_admin:
             admin = True
 
-        if not check_account_exists(account):
+        if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
         
         if req.path_info or not account or account == AUTH_ACCOUNT or not user or \
@@ -979,7 +985,7 @@ class Swauth(object):
         account = req.path_info_pop()
         user = req.path_info_pop()
 
-        if not check_account_exists(account):
+        if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
         
         if req.path_info or not account or account == AUTH_ACCOUNT or not user or \
@@ -1093,7 +1099,7 @@ class Swauth(object):
         if not all((account, user, key)):
             return HTTPUnauthorized(request=req)
         
-        if not check_account_exists(account):
+        if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
         
         if user == '.super_admin' and key == self.super_admin_key:

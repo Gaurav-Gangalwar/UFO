@@ -121,6 +121,18 @@ def add_ip(data, ip):
 
     return tmp_data
 
+def add_fs_name(data, fs_name):
+    fs_name = fs_name.strip(' ')
+    tmp_data = []
+    for item in data:
+        if item.startswith('fs_name'):
+            item = 'fs_name = %s' % fs_name
+
+        tmp_data.append(item)
+
+    return tmp_data
+    
+
     
 def is_valid_ipv4_address(address):
     try:
@@ -156,7 +168,7 @@ def check_num(num):
 
     return True
 
-def update_object_conf(port):
+def update_object_conf(key, value):
     fp = open(CONFIG_PATH_OBJ + '/' + '1.conf', "r")
     data = []
     while True:
@@ -164,8 +176,8 @@ def update_object_conf(port):
         if not line:
             break
         line = line.strip(' ')
-        if line.startswith('bind_port'):
-            line = 'bind_port = %s' % port
+        if line.startswith(key):
+            line = '%s = %s' % (key, value)
         data.append(line)
     fp.close()
     fp = open(CONFIG_PATH_OBJ + '/' + '1.conf', "w")
@@ -174,7 +186,7 @@ def update_object_conf(port):
         fp.write(item + '\n')
     fp.close()
 
-def update_container_conf(port):
+def update_container_conf(key, value):
     fp = open(CONFIG_PATH_CONT + '/' + '1.conf', "r")
     data = []
     while True:
@@ -182,8 +194,8 @@ def update_container_conf(port):
         if not line:
             break
         line = line.strip(' ')
-        if line.startswith('bind_port'):
-            line = 'bind_port = %s' % port
+        if line.startswith(key):
+            line = '%s = %s' % (key, value)
         data.append(line)
     fp.close()
     fp = open(CONFIG_PATH_CONT + '/' + '1.conf', "w")
@@ -192,7 +204,7 @@ def update_container_conf(port):
         fp.write(item + '\n')
     fp.close()
 
-def update_account_conf(port):
+def update_account_conf(key, value):
     fp = open(CONFIG_PATH_ACC + '/' + '1.conf', "r")
     data = []
     while True:
@@ -200,8 +212,8 @@ def update_account_conf(port):
         if not line:
             break
         line = line.strip(' ')
-        if line.startswith('bind_port'):
-            line = 'bind_port = %s' % port
+        if line.startswith(key):
+            line = '%s = %s' % (key, value)
         data.append(line)
     fp.close()
     fp = open(CONFIG_PATH_ACC + '/' + '1.conf', "w")
@@ -220,7 +232,11 @@ if __name__ == '__main__':
         if not key:
             print '!!!Invalid key\n'
             continue
-            
+
+        fs_name = raw_input("Enter FileSystem (Press Enter for default Glusterfs):")
+        if not fs_name:
+            fs_name = 'Glusterfs'
+                
         object_port = raw_input("Enter Object server port (Press Enter for default 6010):")
         if object_port and not check_num(object_port):
             print '!!!Invalid object port\n'
@@ -256,6 +272,7 @@ if __name__ == '__main__':
         
     cmnds = ['cp %s/proxy-server.conf %s/ >> /dev/null' % (CONFIG_FILES_PATH, CONFIG_PATH),
              'cp %s/gluster-object.conf %s/ >> /dev/null' % (CONFIG_FILES_PATH, CONFIG_PATH),
+             'cp %s/fs.conf %s/ >> /dev/null' % (CONFIG_FILES_PATH, CONFIG_PATH),
              'cp %s/object-server.conf %s/1.conf >> /dev/null' % (CONFIG_FILES_PATH, CONFIG_PATH_OBJ),
              'cp %s/container-server.conf %s/1.conf >> /dev/null' % (CONFIG_FILES_PATH, CONFIG_PATH_CONT),
              'cp %s/account-server.conf %s/1.conf >> /dev/null' % (CONFIG_FILES_PATH, CONFIG_PATH_ACC)]
@@ -290,17 +307,24 @@ if __name__ == '__main__':
     data = add_key(data, key)
     data = add_ip(data, ip)
 
+    if fs_name:
+        data = add_fs_name(data, fs_name)
+        update_object_conf('fs_name', fs_name)
+        update_container_conf('fs_name', fs_name)
+        update_account_conf('fs_name', fs_name)
+        
+
     if object_port:
         data = add_object_port(data, object_port)
-        update_object_conf(object_port)
+        update_object_conf('bind_port', object_port)
 
     if container_port:
         data = add_container_port(data, container_port)
-        update_container_conf(container_port)
+        update_container_conf('bind_port', container_port)
 
     if account_port:
         data = add_account_port(data, account_port)
-        update_account_conf(account_port)
+        update_account_conf('bind_port', account_port)
 
     fp = open(CONFIG_PATH + '/' + 'proxy-server.conf', "w")
     for item in data:

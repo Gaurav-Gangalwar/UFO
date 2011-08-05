@@ -32,14 +32,15 @@ import simplejson
 from swift.common.utils import get_logger, get_param, hash_path, \
     normalize_timestamp, split_path, storage_directory, read_metadata, \
     write_metadata, dir_empty, mkdirs, rmdirs, check_valid_account, \
-    XML_EXTRA_ENTITIES
+    get_device_from_account
 from swift.common.constraints import ACCOUNT_LISTING_LIMIT, \
     check_mount, check_float, check_utf8
 #from swift.common.db_replicator import ReplicatorRpc
 from swift.container.server import DiskDir
 from swift.common.utils import X_CONTENT_TYPE, X_CONTENT_LENGTH, X_TIMESTAMP,\
      X_PUT_TIMESTAMP, X_TYPE, X_ETAG, X_OBJECTS_COUNT, X_BYTES_USED, \
-     X_CONTAINER_COUNT, MOUNT_PATH, ACCOUNT, RESELLER_PREFIX
+     X_CONTAINER_COUNT, MOUNT_PATH, ACCOUNT, XML_EXTRA_ENTITIES
+from swift import plugins
 
 
 DATADIR = 'accounts'
@@ -50,12 +51,15 @@ class AccountController(object):
 
     def __init__(self, conf):
         self.logger = get_logger(conf, log_route='account-server')
-        #self.root = conf.get('devices', '/srv/node')
-        self.root = MOUNT_PATH
+        self.fs_name = conf.get('fs_name', 'Glusterfs')
+        self.fs_object = getattr(plugins, self.fs_name, False)
+        if not self.fs_object:
+            raise Exception('Invalid Filesystem name %s', self.fs_name)
+        self.fs_object = self.fs_object()
+        self.root = self.fs_object.mount_path
         self.mount_check = conf.get('mount_check', 'true').lower() in \
                               ('true', 't', '1', 'on', 'yes', 'y')
-        #self.replicator_rpc = \
-            #ReplicatorRpc(self.root, DATADIR, AccountBroker, self.mount_check)
+        
 
     def DELETE(self, req):
         """Handle HTTP DELETE request."""
@@ -67,7 +71,7 @@ class AccountController(object):
             return HTTPBadRequest(body=str(err), content_type='text/plain',
                                                     request=req)
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(account.replace(RESELLER_PREFIX, '', 1)):
+            if not check_valid_account(get_device_from_account(account), self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         if 'x-timestamp' not in req.headers or \
                     not check_float(req.headers['x-timestamp']):
@@ -105,7 +109,7 @@ class AccountController(object):
             return HTTPBadRequest(body=str(err), content_type='text/plain',
                                   request=req)
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(account.replace(RESELLER_PREFIX, '', 1)):
+            if not check_valid_account(get_device_from_account(account), self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
 
         #Account always create with default uid.
@@ -159,7 +163,7 @@ class AccountController(object):
             return HTTPBadRequest(body=str(err), content_type='text/plain',
                                                     request=req)
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(account.replace(RESELLER_PREFIX, '', 1)):
+            if not check_valid_account(get_device_from_account(account), self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         
         dir_obj = DiskDir(self.root, drive, part, account, '', self.logger)
@@ -188,7 +192,7 @@ class AccountController(object):
             return HTTPBadRequest(body=str(err), content_type='text/plain',
                                                     request=req)
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(account.replace(RESELLER_PREFIX, '', 1)):
+            if not check_valid_account(get_device_from_account(account), self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         dir_obj = DiskDir(self.root, drive, part, account, '', self.logger)
         if not dir_obj.dir_exists:
@@ -288,7 +292,7 @@ class AccountController(object):
             return HTTPBadRequest(body='Missing or bad timestamp',
                 request=req, content_type='text/plain')
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(account.replace(RESELLER_PREFIX, '', 1)):
+            if not check_valid_account(get_device_from_account(account), self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         dir_obj = DiskDir(self.root, drive, part, account, '', self.logger)
         if not dir_obj.dir_exists:

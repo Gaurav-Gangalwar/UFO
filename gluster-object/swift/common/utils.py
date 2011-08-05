@@ -1124,8 +1124,8 @@ def dir_empty(path):
 
 
 def get_device_from_account(account):
-    if '_' in account:
-        device = account.split('_', 1)[1]
+    if account.startswith(RESELLER_PREFIX):
+        device = account.replace(RESELLER_PREFIX, '', 1)
         return device
 
 def check_user_xattr(path):
@@ -1144,36 +1144,30 @@ def check_user_xattr(path):
     return True
 
    
-def _check_valid_account(account):
-    if not check_account_exists(account):
+def _check_valid_account(account, fs_object):
+    mount_path = getattr(fs_object, 'mount_path', MOUNT_PATH)
+    
+    if not check_account_exists(account, fs_object):
         logging.error('Account not present %s', account)
         return False
     
-    if not check_mount(MOUNT_PATH, account):
-        if not os.path.isdir(os.path.join(MOUNT_PATH, account)):
-            #mkdir_cmd = 'mkdir -p %s/%s' % (MOUNT_PATH, account)
-            #if os.system(mkdir_cmd):
-                #print 'Command failed: %s' % (mkdir_cmd)
-                #return False
-            #Check if dir created.    
-            mkdirs(os.path.join(MOUNT_PATH, account))
+    if not check_mount(mount_path, account):
+        if not os.path.isdir(os.path.join(mount_path, account)):
+            mkdirs(os.path.join(mount_path, account))
 
-        umnt_cmd = 'umount %s 2>> /dev/null' % os.path.join(MOUNT_PATH, account)
+        umnt_cmd = 'umount %s 2>> /dev/null' % os.path.join(mount_path, account)
         os.system(umnt_cmd)
             
-        mnt_cmd = 'mount -t glusterfs %s:%s %s/%s' % (MOUNT_IP, account, \
-                                                           MOUNT_PATH, account)
-        if os.system(mnt_cmd) or \
-        not os.path.exists(os.path.join(MOUNT_PATH, account)):
-            logging.error('Mount failed: %s' % (mnt_cmd))
+    if fs_object:
+        if not fs_object.mount(MOUNT_IP, account, os.path.join(mount_path, account)):
             return False
 
-    if not check_user_xattr(os.path.join(MOUNT_PATH, account)):
+    if not check_user_xattr(os.path.join(mount_path, account)):
         logging.error('Error: No support for user.xattr on backend %s' % account)
         return False
 
-    chmod_cmd = ['chmod 777 %s' % (MOUNT_PATH), \
-                 'chmod 777 %s/%s' % (MOUNT_PATH, account)]
+    chmod_cmd = ['chmod 777 %s' % (mount_path), \
+                 'chmod 777 %s/%s' % (mount_path, account)]
 
     for cmd in chmod_cmd:
         if os.system(cmd):
@@ -1182,12 +1176,8 @@ def _check_valid_account(account):
     
     return True
 
-def check_valid_account(account):
-    #if not _check_valid_account(AUTH_ACCOUNT):
-        #print 'Error : Auth account not present'
-        #return False
-
-    return _check_valid_account(account)
+def check_valid_account(account, fs_object):
+    return _check_valid_account(account, fs_object)
 
 def validate_container(metadata):
     if not metadata:
@@ -1267,9 +1257,7 @@ def get_container_details(cont_path):
                 for file_name in files:
                     meta = read_metadata(path + '/' + file_name)
                     if not meta:
-                       #meta = get_object_metadata(path + '/' + file_name)
-                       #restore_object(path + '/' + file_name, meta)
-                        create_object_metadata(path + '/' + file_name)
+                       create_object_metadata(path + '/' + file_name)
                     if obj_path:
                         object_list.append(obj_path + file_name)
                     else:
@@ -1281,9 +1269,7 @@ def get_container_details(cont_path):
                 for dir_name in dirs:
                     meta = read_metadata(path + '/' + dir_name)
                     if not meta:
-                       #meta = get_object_metadata(path + '/' + file_name)
-                       #restore_object(path + '/' + file_name, meta)
-                        create_object_metadata(path + '/' + dir_name)
+                       create_object_metadata(path + '/' + dir_name)
                     if obj_path:
                         object_list.append(obj_path + dir_name)
                     else:
@@ -1309,8 +1295,6 @@ def get_account_details(acc_path):
                     continue
                 meta = read_metadata(acc_path + '/' + name)
                 if not meta:
-                    #meta = get_container_metadata(acc_path + '/' + name)
-                    #restore_container(acc_path + '/' + name, meta)
                     create_container_metadata(acc_path + '/' + name)
                 container_count += 1
                 container_list.append(name)
@@ -1411,32 +1395,17 @@ def create_account_metadata(acc_path):
     restore_account(acc_path, meta)
 
 
-def check_account_exists(account):
-    if account not in get_account_list():
+def check_account_exists(account, fs_object):
+    if account not in get_account_list(fs_object):
         logging.error('Account not exists %s' % account)
         return False
     else:
         return True
 
-def get_account_list():
+def get_account_list(fs_object):
     account_list = []
-    cmnd = 'gluster volume info'
-
-    if os.system(cmnd + ' >> /dev/null'):
-        print 'Getting volume failed'
-        return account_list
-
-    fp = os.popen(cmnd)
-    while True:
-        item = fp.readline()
-        if not item:
-            break
-        item = item.strip(' ').strip('\n').lower()
-        if item.startswith('volume name:'):
-            #print item
-            account_list.append(item.split(':')[1].strip(' '))
-            
-    #print account_list
+    if fs_object:
+        account_list = fs_object.get_export_list()
     return account_list
 
 
