@@ -33,8 +33,8 @@ class Glusterfs(object):
             item = fp.readline()
             if not item:
                 break
-            item = item.strip(' ').strip('\n').lower()
-            if item.startswith('volume name:'):
+            item = item.strip(' ').strip('\n')
+            if item.lower().startswith('volume name:'):
                 export_list.append(item.split(':')[1].strip(' '))
             
         return export_list
