@@ -41,7 +41,7 @@ from swift.common.utils import mkdirs, normalize_timestamp, \
     storage_directory, hash_path, renamer, fallocate, \
     split_path, drop_buffer_cache, get_logger, write_pickle, \
     read_metadata, write_metadata, mkdirs, rmdirs, validate_object, \
-    check_valid_account, create_object_metadata, get_device_from_account
+    check_valid_account, create_object_metadata
 from swift.common.bufferedhttp import http_connect
 from swift.common.constraints import check_object_creation, check_mount, \
     check_float, check_utf8
@@ -541,7 +541,7 @@ class ObjectController(object):
             return HTTPBadRequest(body='Missing timestamp', request=request,
                         content_type='text/plain')
         if self.mount_check and not check_mount(self.devices, device):
-            if not check_valid_account(get_device_from_account(account), self.fs_object):
+            if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % device)
         file_obj = DiskFile(self.devices, device, partition, account, container,
                         obj, self.logger, disk_chunk_size=self.disk_chunk_size)
@@ -586,7 +586,7 @@ class ObjectController(object):
             return HTTPBadRequest(body=str(err), request=request,
                         content_type='text/plain')
         if self.mount_check and not check_mount(self.devices, device):
-            if not check_valid_account(get_device_from_account(account), self.fs_object):
+            if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % device)
         if 'x-timestamp' not in request.headers or \
                     not check_float(request.headers['x-timestamp']):
@@ -689,7 +689,7 @@ class ObjectController(object):
             return HTTPBadRequest(body=str(err), request=request,
                         content_type='text/plain')
         if self.mount_check and not check_mount(self.devices, device):
-            if not check_valid_account(get_device_from_account(account), self.fs_object):
+            if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % device)
         file_obj = DiskFile(self.devices, device, partition, account, container,
                         obj, self.logger, keep_data_fp=True,
@@ -783,7 +783,7 @@ class ObjectController(object):
             resp.body = str(err)
             return resp
         if self.mount_check and not check_mount(self.devices, device):
-            if not check_valid_account(get_device_from_account(account), self.fs_object):
+            if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % device)
         file_obj = DiskFile(self.devices, device, partition, account, container,
                         obj, self.logger, disk_chunk_size=self.disk_chunk_size)
@@ -828,7 +828,7 @@ class ObjectController(object):
             return HTTPBadRequest(body='Missing timestamp', request=request,
                         content_type='text/plain')
         if self.mount_check and not check_mount(self.devices, device):
-            if not check_valid_account(get_device_from_account(account), self.fs_object):
+            if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % device)
         response_class = HTTPNoContent
         file_obj = DiskFile(self.devices, device, partition, account, container,

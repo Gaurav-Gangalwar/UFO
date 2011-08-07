@@ -1147,7 +1147,8 @@ def check_user_xattr(path):
 def _check_valid_account(account, fs_object):
     mount_path = getattr(fs_object, 'mount_path', MOUNT_PATH)
     
-    if not check_account_exists(account, fs_object):
+    if not check_account_exists(fs_object.get_export_from_account_id(account), \
+                                fs_object):
         logging.error('Account not present %s', account)
         return False
     
@@ -1155,9 +1156,8 @@ def _check_valid_account(account, fs_object):
         if not os.path.isdir(os.path.join(mount_path, account)):
             mkdirs(os.path.join(mount_path, account))
 
-        umnt_cmd = 'umount %s 2>> /dev/null' % os.path.join(mount_path, account)
-        os.system(umnt_cmd)
-            
+        fs_object.unmount(os.path.join(mount_path, account))
+                    
     if fs_object:
         if not fs_object.mount(MOUNT_IP, account, os.path.join(mount_path, account)):
             return False
@@ -1409,5 +1409,6 @@ def get_account_list(fs_object):
     return account_list
 
 
-
+def get_account_id(account):
+    return RESELLER_PREFIX + md5(account + HASH_PATH_SUFFIX).hexdigest()
     

@@ -37,7 +37,7 @@ from swift.common.utils import get_logger, get_param, hash_path, \
     write_metadata, clean_metadata, dir_empty, mkdirs, rmdirs, validate_account, \
     validate_container, validate_object, check_valid_account, is_marker, \
     get_container_details, get_account_details, create_container_metadata, \
-    create_account_metadata, get_device_from_account
+    create_account_metadata
 from swift.common.constraints import CONTAINER_LISTING_LIMIT, \
     check_mount, check_float, check_utf8
 from swift.common.bufferedhttp import http_connect
@@ -499,7 +499,7 @@ class ContainerController(object):
             return HTTPBadRequest(body='Missing timestamp', request=req,
                         content_type='text/plain')
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(get_device_from_account(account), self.fs_object):
+            if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         #broker = self._get_container_broker(drive, part, account, container)
         dir_obj = DiskDir(self.root, drive, part, account, container, self.logger)
@@ -542,7 +542,7 @@ class ContainerController(object):
             return HTTPBadRequest(body='Missing timestamp', request=req,
                         content_type='text/plain')
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(get_device_from_account(account), self.fs_object):
+            if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         timestamp = normalize_timestamp(req.headers['x-timestamp'])
         #TODO: Store this timestamp as created time if container doesn't exists.
@@ -597,7 +597,7 @@ class ContainerController(object):
             return HTTPBadRequest(body=str(err), content_type='text/plain',
                                 request=req)
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(get_device_from_account(account), self.fs_object):
+            if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         
         dir_obj = DiskDir(self.root, drive, part, account, container, self.logger)
@@ -627,7 +627,7 @@ class ContainerController(object):
             return HTTPBadRequest(body=str(err), content_type='text/plain',
                                 request=req)
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(get_device_from_account(account), self.fs_object):
+            if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         
         dir_obj = DiskDir(self.root, drive, part, account, container, self.logger)
@@ -744,7 +744,7 @@ class ContainerController(object):
             return HTTPBadRequest(body='Missing or bad timestamp',
                 request=req, content_type='text/plain')
         if self.mount_check and not check_mount(self.root, drive):
-            if not check_valid_account(get_device_from_account(account), self.fs_object):
+            if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         dir_obj = DiskDir(self.root, drive, part, account, container, self.logger)
         if not dir_obj.dir_exists:

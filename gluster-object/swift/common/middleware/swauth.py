@@ -37,8 +37,10 @@ from webob.exc import HTTPAccepted, HTTPBadRequest, HTTPConflict, \
 from swift.common.bufferedhttp import http_connect_raw as http_connect
 from swift.common.middleware.acl import clean_acl, parse_acl, referrer_allowed
 from swift.common.utils import cache_from_env, get_logger, \
-     split_path, urlparse, get_account_list, check_account_exists
-from swift.common.utils import RESELLER_PREFIX, AUTH_ACCOUNT, DEFAULT_UID, DEFAULT_GID
+     split_path, urlparse, get_account_list, check_account_exists, \
+     get_account_id
+from swift.common.utils import RESELLER_PREFIX, DEFAULT_UID, DEFAULT_GID, \
+     HASH_PATH_SUFFIX
 import swift.common.authtypes
 from swift import plugins
 
@@ -68,9 +70,6 @@ class Swauth(object):
             self.auth_prefix = '/' + self.auth_prefix
         if self.auth_prefix[-1] != '/':
             self.auth_prefix += '/'
-        #self.auth_account = '%s.auth' % self.reseller_prefix
-        self.auth_account = '%s%s' % (self.reseller_prefix, AUTH_ACCOUNT)
-        #self.storage_url = conf.get('storage_url', 'http://127.0.0.1:8080/v1') 
         self.default_gluster_object_cluster = conf.get('default_gluster_object_cluster',
             'local#http://127.0.0.1:8080/v1')
         self.fs_name = conf.get('fs_name', 'Glusterfs')
@@ -78,6 +77,10 @@ class Swauth(object):
         if not self.fs_object:
             raise Exception('Invalid Filesystem name %s', self.fs_name)
         self.fs_object = self.fs_object()
+        self.auth_account = self.fs_object.auth_account
+        if not self.auth_account:
+            raise Exception('No auth account %s', self.fs_name)
+        self.auth_account_id = get_account_id(self.auth_account)
         # This setting is a little messy because of the options it has to
         # provide. The basic format is cluster_name#url, such as the default
         # value of local#http://127.0.0.1:8080/v1.
@@ -217,6 +220,7 @@ class Swauth(object):
         groups = None
         memcache_client = cache_from_env(env)
         if memcache_client:
+            #TODO_AUTH
             memcache_key = '%s/auth/%s' % (self.reseller_prefix, token)
             cached_auth_data = memcache_client.get(memcache_key)
             if cached_auth_data:
@@ -232,7 +236,7 @@ class Swauth(object):
             gid = DEFAULT_GID
             account = env['HTTP_AUTHORIZATION'].split(' ')[1]
             account, user, sign = account.split(':')
-            path = quote('/v1/%s/%s/%s' % (self.auth_account, account, user))
+            path = quote('/v1/%s/%s/%s' % (self.auth_account_id, account, user))
             resp = self.make_request(env, 'GET', path).get_response(self.app)
             if resp.status_int // 100 != 2:
                 return groups, uid, gid
@@ -240,7 +244,7 @@ class Swauth(object):
             if 'x-object-meta-account-id' in resp.headers:
                 account_id = resp.headers['x-object-meta-account-id']
             else:
-                path = quote('/v1/%s/%s' % (self.auth_account, account))
+                path = quote('/v1/%s/%s' % (self.auth_account_id, account))
                 resp2 = self.make_request(env, 'HEAD',
                                           path).get_response(self.app)
                 if resp2.status_int // 100 != 2:
@@ -251,7 +255,7 @@ class Swauth(object):
             env['PATH_INFO'] = path.replace("%s:%s" % (account, user),
                                             account_id, 1)
             detail = json.loads(resp.body)
-
+            #TODO_AUTH
             password = detail['auth'].split(':')[-1]
             msg = base64.urlsafe_b64decode(unquote(token))
             s = base64.encodestring(hmac.new(detail['auth'].split(':')[-1],
@@ -269,7 +273,7 @@ class Swauth(object):
 
         if not groups:
             path = quote('/v1/%s/.token_%s/%s' %
-                         (self.auth_account, token[-1], token))
+                         (self.auth_account_id, token[-1], token))
             resp = self.make_request(env, 'GET', path).get_response(self.app)
             if resp.status_int // 100 != 2:
                 return groups, uid, gid
@@ -302,13 +306,13 @@ class Swauth(object):
         #print 'authorize', account, (req.remote_user or '').split(',')
         #Not allowing access to auth acocunt.
         if not account or not account.startswith(self.reseller_prefix) or \
-           account == self.auth_account:
+           account == self.auth_account_id:
             return self.denied_response(req)
         user_groups = (req.remote_user or '').split(',')
         #.reseller_admin not allowed to access auth account.
         if '.reseller_admin' in user_groups and \
                 account != self.reseller_prefix and \
-                account != self.auth_account:
+                account != self.auth_account_id:
             return None
         if account in user_groups and \
                 (req.method not in ('DELETE', 'PUT') or container):
@@ -388,6 +392,7 @@ class Swauth(object):
                 minsegs=1, maxsegs=4, rest_with_last=True)
         except ValueError:
             return HTTPNotFound(request=req)
+        #TODO_AUTH
         if version in ('v1', 'v1.0', 'auth'):
             if req.method == 'GET':
                 handler = self.handle_get_token
@@ -438,25 +443,25 @@ class Swauth(object):
         :param req: The webob.Request to process.
         :returns: webob.Response, 204 on success
         """
-        if not check_account_exists(AUTH_ACCOUNT, self.fs_object):
+        if not check_account_exists(self.auth_account, self.fs_object):
             return HTTPNotFound(request=req)
              
         if not self.is_super_admin(req):
             return HTTPForbidden(request=req)
-        path = quote('/v1/%s' % self.auth_account)
+        path = quote('/v1/%s' % self.auth_account_id)
         resp = self.make_request(req.environ, 'PUT',
                                  path).get_response(self.app)
         if resp.status_int // 100 != 2:
             raise Exception('Could not create the main auth account: %s %s' %
                             (path, resp.status))
-        path = quote('/v1/%s/.account_id' % self.auth_account)
+        path = quote('/v1/%s/.account_id' % self.auth_account_id)
         resp = self.make_request(req.environ, 'PUT',
                                  path).get_response(self.app)
         if resp.status_int // 100 != 2:
             raise Exception('Could not create container: %s %s' %
                             (path, resp.status))
         for container in xrange(16):
-            path = quote('/v1/%s/.token_%x' % (self.auth_account, container))
+            path = quote('/v1/%s/.token_%x' % (self.auth_account_id, container))
             resp = self.make_request(req.environ, 'PUT',
                                      path).get_response(self.app)
             if resp.status_int // 100 != 2:
@@ -510,10 +515,11 @@ class Swauth(object):
         :returns: webob.Response, 2xx on success with a JSON dictionary as
                   explained above.
         """
+        #TODO_CHECK
         account = req.path_info_pop()
         if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
-        if req.path_info or not account or account == AUTH_ACCOUNT:
+        if req.path_info or not account or account == self.auth_account:
             return HTTPBadRequest(request=req)
         if not self.is_account_admin(req, account):
             return HTTPForbidden(request=req)
@@ -527,7 +533,7 @@ class Swauth(object):
         marker = ''
         while True:
             path = '/v1/%s?format=json&marker=%s' % (quote('%s/%s' %
-                (self.auth_account, account)), quote(marker))
+                (self.auth_account_id, account)), quote(marker))
             resp = self.make_request(req.environ, 'GET',
                                      path).get_response(self.app)
             if resp.status_int == 404:
@@ -590,7 +596,7 @@ class Swauth(object):
         if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
         
-        if req.path_info != '/.services' or not account or account == AUTH_ACCOUNT:
+        if req.path_info != '/.services' or not account or account == self.auth_account:
             return HTTPBadRequest(request=req)
         try:
             new_services = json.loads(req.body)
@@ -607,7 +613,7 @@ class Swauth(object):
                 services[new_service] = value
         # Save the new services information
         services = json.dumps(services)
-        path = quote('/v1/%s/%s/.services' % (self.auth_account, account))
+        path = quote('/v1/%s/%s/.services' % (self.auth_account_id, account))
         resp = self.make_request(req.environ, 'PUT', path,
                                  services).get_response(self.app)
         if resp.status_int // 100 != 2:
@@ -635,11 +641,11 @@ class Swauth(object):
         if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
         
-        if req.path_info or not account or account == AUTH_ACCOUNT:
+        if req.path_info or not account or account == self.auth_account:
             return HTTPBadRequest(request=req)
         # Ensure the container in the main auth account exists (this
         # container represents the new account)
-        path = quote('/v1/%s/%s' % (self.auth_account, account))
+        path = quote('/v1/%s/%s' % (self.auth_account_id, account))
         resp = self.make_request(req.environ, 'HEAD',
                                  path).get_response(self.app)
         if resp.status_int == 404:
@@ -683,7 +689,7 @@ class Swauth(object):
             raise
         # Record the mapping from account id back to account name
         path = quote('/v1/%s/.account_id/%s%s' %
-                     (self.auth_account, self.reseller_prefix, account_suffix))
+                     (self.auth_account_id, self.reseller_prefix, account_suffix))
         resp = self.make_request(req.environ, 'PUT', path,
                                  account).get_response(self.app)
         if resp.status_int // 100 != 2:
@@ -691,7 +697,7 @@ class Swauth(object):
                             (path, resp.status))
         
         # Record the cluster url(s) for the account
-        path = quote('/v1/%s/%s/.services' % (self.auth_account, account))
+        path = quote('/v1/%s/%s/.services' % (self.auth_account_id, account))
         #print 'Gaurav acc_put path', path
         services = {'storage': {}}
         services['storage'][self.dsc_name] = '%s/%s%s' % (self.dsc_url,
@@ -706,7 +712,7 @@ class Swauth(object):
         
         
         # Record the mapping from account name to the account id
-        path = quote('/v1/%s/%s' % (self.auth_account, account))
+        path = quote('/v1/%s/%s' % (self.auth_account_id, account))
         resp = self.make_request(req.environ, 'POST', path,
             headers={'X-Container-Meta-Account-Id': '%s%s' %
             (self.reseller_prefix, account_suffix)}).get_response(self.app)
@@ -732,13 +738,13 @@ class Swauth(object):
         if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
         
-        if req.path_info or not account or account == AUTH_ACCOUNT:
+        if req.path_info or not account or account == self.auth_account:
             return HTTPBadRequest(request=req)
         # Make sure the account has no users and get the account_id
         marker = ''
         while True:
             path = '/v1/%s?format=json&marker=%s' % (quote('%s/%s' %
-                (self.auth_account, account)), quote(marker))
+                (self.auth_account_id, account)), quote(marker))
             resp = self.make_request(req.environ, 'GET',
                                      path).get_response(self.app)
             if resp.status_int == 404:
@@ -781,7 +787,7 @@ class Swauth(object):
                     deleted_any = True
             # Delete the .services object itself.
             path = quote('/v1/%s/%s/.services' %
-                         (self.auth_account, account))
+                         (self.auth_account_id, account))
             resp = self.make_request(req.environ, 'DELETE',
                                      path).get_response(self.app)
             if resp.status_int // 100 != 2 and resp.status_int != 404:
@@ -789,7 +795,7 @@ class Swauth(object):
                                 (path, resp.status))
         
         # Delete the account marker itself.
-        path = quote('/v1/%s/%s' % (self.auth_account, account))
+        path = quote('/v1/%s/%s' % (self.auth_account_id, account))
         resp = self.make_request(req.environ, 'DELETE',
                                  path).get_response(self.app)
         if resp.status_int // 100 != 2 and resp.status_int != 404:
@@ -843,7 +849,7 @@ class Swauth(object):
             return HTTPNotFound(request=req)
         
         user = req.path_info_pop()
-        if req.path_info or not account or account == AUTH_ACCOUNT or not user or \
+        if req.path_info or not account or account == self.auth_account or not user or \
                 (user[0] == '.' and user != '.groups'):
             return HTTPBadRequest(request=req)
         if not self.is_account_admin(req, account):
@@ -857,7 +863,7 @@ class Swauth(object):
             marker = ''
             while True:
                 path = '/v1/%s?format=json&marker=%s' % (quote('%s/%s' %
-                    (self.auth_account, account)), quote(marker))
+                    (self.auth_account_id, account)), quote(marker))
                 resp = self.make_request(req.environ, 'GET',
                                          path).get_response(self.app)
                 if resp.status_int == 404:
@@ -870,7 +876,7 @@ class Swauth(object):
                     break
                 for obj in sublisting:
                     if obj['name'][0] != '.':
-                        path = quote('/v1/%s/%s/%s' % (self.auth_account,
+                        path = quote('/v1/%s/%s/%s' % (self.auth_account_id,
                                                        account, obj['name']))
                         resp = self.make_request(req.environ, 'GET',
                                                  path).get_response(self.app)
@@ -883,7 +889,7 @@ class Swauth(object):
             body = json.dumps({'groups':
                                 [{'name': g} for g in sorted(groups)]})
         else:
-            path = quote('/v1/%s/%s/%s' % (self.auth_account, account, user))
+            path = quote('/v1/%s/%s/%s' % (self.auth_account_id, account, user))
             resp = self.make_request(req.environ, 'GET',
                                      path).get_response(self.app)
             if resp.status_int == 404:
@@ -930,7 +936,7 @@ class Swauth(object):
         if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
         
-        if req.path_info or not account or account == AUTH_ACCOUNT or not user or \
+        if req.path_info or not account or account == self.auth_account or not user or \
                 user[0] == '.' or not key:
             return HTTPBadRequest(request=req)
         if reseller_admin:
@@ -941,7 +947,7 @@ class Swauth(object):
 
         self.create_main_auth_account(req, account)
 
-        path = quote('/v1/%s/%s' % (self.auth_account, account))
+        path = quote('/v1/%s/%s' % (self.auth_account_id, account))
         resp = self.make_request(req.environ, 'HEAD',
                                  path).get_response(self.app)
         if resp.status_int // 100 != 2:
@@ -951,13 +957,14 @@ class Swauth(object):
                         resp.headers['x-container-meta-account-id']}
         # Create the object in the main auth account (this object represents
         # the user)
-        path = quote('/v1/%s/%s/%s' % (self.auth_account, account, user))
+        path = quote('/v1/%s/%s/%s' % (self.auth_account_id, account, user))
         groups = ['%s:%s' % (account, user), account]
         if admin:
             groups.append('.admin')
         if reseller_admin:
             groups.append('.reseller_admin')
         auth_value = self.auth_encoder().encode(key)
+        #TODO_AUTH
         resp = self.make_request(req.environ, 'PUT', path,
             json.dumps({'auth': auth_value,
                         'uid': uid,
@@ -988,13 +995,13 @@ class Swauth(object):
         if not check_account_exists(account, self.fs_object):
             return HTTPNotFound(request=req)
         
-        if req.path_info or not account or account == AUTH_ACCOUNT or not user or \
+        if req.path_info or not account or account == self.auth_account or not user or \
                 user[0] == '.':
             return HTTPBadRequest(request=req)
         if not self.is_account_admin(req, account):
             return HTTPForbidden(request=req)
         # Delete the user's existing token, if any.
-        path = quote('/v1/%s/%s/%s' % (self.auth_account, account, user))
+        path = quote('/v1/%s/%s/%s' % (self.auth_account_id, account, user))
         resp = self.make_request(req.environ, 'HEAD',
                                  path).get_response(self.app)
         if resp.status_int == 404:
@@ -1005,14 +1012,14 @@ class Swauth(object):
         candidate_token = resp.headers.get('x-object-meta-auth-token')
         if candidate_token:
             path = quote('/v1/%s/.token_%s/%s' %
-                (self.auth_account, candidate_token[-1], candidate_token))
+                (self.auth_account_id, candidate_token[-1], candidate_token))
             resp = self.make_request(req.environ, 'DELETE',
                                      path).get_response(self.app)
             if resp.status_int // 100 != 2 and resp.status_int != 404:
                 raise Exception('Could not delete possibly existing token: '
                                 '%s %s' % (path, resp.status))
         # Delete the user entry itself.
-        path = quote('/v1/%s/%s/%s' % (self.auth_account, account, user))
+        path = quote('/v1/%s/%s/%s' % (self.auth_account_id, account, user))
         resp = self.make_request(req.environ, 'DELETE',
                                  path).get_response(self.app)
         if resp.status_int // 100 != 2 and resp.status_int != 404:
@@ -1071,6 +1078,7 @@ class Swauth(object):
                                   rest_with_last=True)
         except ValueError:
             return HTTPNotFound(request=req)
+        #TODO_AUTH
         if pathsegs[0] == 'v1' and pathsegs[2] == 'auth':
             account = pathsegs[1]
             user = req.headers.get('x-storage-user')
@@ -1084,6 +1092,7 @@ class Swauth(object):
             key = req.headers.get('x-storage-pass')
             if not key:
                 key = req.headers.get('x-auth-key')
+        #TODO_AUTH
         elif pathsegs[0] in ('auth', 'v1.0'):
             user = req.headers.get('x-auth-user')
             if not user:
@@ -1103,7 +1112,7 @@ class Swauth(object):
             return HTTPNotFound(request=req)
         
         if user == '.super_admin' and key == self.super_admin_key:
-            if account == AUTH_ACCOUNT:
+            if account == self.auth_account:
                 return HTTPForbidden(request=req)
             services = self.get_services(req, account)
             #print 'get_token', services
@@ -1117,7 +1126,7 @@ class Swauth(object):
               headers={'x-auth-token': token, 'x-storage-token': token,
                        'x-storage-url': url})
         # Authenticate user
-        path = quote('/v1/%s/%s/%s' % (self.auth_account, account, user))
+        path = quote('/v1/%s/%s/%s' % (self.auth_account_id, account, user))
         resp = self.make_request(req.environ, 'GET',
                                  path).get_response(self.app)
         if resp.status_int == 404:
@@ -1133,7 +1142,7 @@ class Swauth(object):
         candidate_token = resp.headers.get('x-object-meta-auth-token')
         if candidate_token:
             path = quote('/v1/%s/.token_%s/%s' %
-                (self.auth_account, candidate_token[-1], candidate_token))
+                (self.auth_account_id, candidate_token[-1], candidate_token))
             resp = self.make_request(req.environ, 'GET',
                                      path).get_response(self.app)
             if resp.status_int // 100 == 2:
@@ -1149,7 +1158,7 @@ class Swauth(object):
         # Create a new token if one didn't exist
         if not token:
             # Retrieve account id, we'll save this in the token
-            path = quote('/v1/%s/%s' % (self.auth_account, account))
+            path = quote('/v1/%s/%s' % (self.auth_account_id, account))
             resp = self.make_request(req.environ, 'HEAD',
                                      path).get_response(self.app)
             if resp.status_int // 100 != 2:
@@ -1161,7 +1170,7 @@ class Swauth(object):
             token = '%stk%s' % (self.reseller_prefix, uuid4().hex)
             # Save token info
             path = quote('/v1/%s/.token_%s/%s' %
-                         (self.auth_account, token[-1], token))
+                         (self.auth_account_id, token[-1], token))
             resp = self.make_request(req.environ, 'PUT', path,
                 json.dumps({'account': account, 'user': user,
                 'uid': user_detail['uid'], 'gid': user_detail['gid'],
@@ -1172,7 +1181,7 @@ class Swauth(object):
                 raise Exception('Could not create new token: %s %s' %
                                 (path, resp.status))
             # Record the token with the user info for future use.
-            path = quote('/v1/%s/%s/%s' % (self.auth_account, account, user))
+            path = quote('/v1/%s/%s/%s' % (self.auth_account_id, account, user))
             resp = self.make_request(req.environ, 'POST', path,
                 headers={'X-Object-Meta-Auth-Token': token}
                 ).get_response(self.app)
@@ -1221,6 +1230,7 @@ class Swauth(object):
         expires = groups = None
         memcache_client = cache_from_env(req.environ)
         if memcache_client:
+            #TODO_AUTH
             memcache_key = '%s/auth/%s' % (self.reseller_prefix, token)
             cached_auth_data = memcache_client.get(memcache_key)
             if cached_auth_data:
@@ -1229,7 +1239,7 @@ class Swauth(object):
                     groups = None
         if not groups:
             path = quote('/v1/%s/.token_%s/%s' %
-                         (self.auth_account, token[-1], token))
+                         (self.auth_account_id, token[-1], token))
             resp = self.make_request(req.environ, 'GET',
                                      path).get_response(self.app)
             if resp.status_int // 100 != 2:
@@ -1303,14 +1313,16 @@ class Swauth(object):
         if not self.itoken or self.itoken_expires < time():
             #print 'Gaurav getting memcache'
             self.itoken = '%sitk%s' % (self.reseller_prefix, uuid4().hex)
+            #TODO_AUTH
             memcache_key = '%s/auth/%s' % (self.reseller_prefix, self.itoken)
             self.itoken_expires = time() + self.token_life - 60
             memcache_client = cache_from_env(env)
             if not memcache_client:
                 raise Exception(
                     'No memcache set up; required for Swauth middleware')
+            #TODO_AUTH
             memcache_client.set(memcache_key, (self.itoken_expires,
-                'auth,.reseller_admin,%s' % self.auth_account, DEFAULT_UID, \
+                '%s,.reseller_admin,%s' % (self.auth_account, self.auth_account_id), DEFAULT_UID, \
                 DEFAULT_GID), timeout=self.token_life)
             
             
@@ -1330,7 +1342,7 @@ class Swauth(object):
             return None
         admin_account, admin_user = \
             req.headers.get('x-auth-admin-user').split(':', 1)
-        path = quote('/v1/%s/%s/%s' % (self.auth_account, admin_account,
+        path = quote('/v1/%s/%s/%s' % (self.auth_account_id, admin_account,
                                        admin_user))
         resp = self.make_request(req.environ, 'GET',
                                  path).get_response(self.app)
@@ -1345,7 +1357,7 @@ class Swauth(object):
 
     def get_services(self, req, account, create = True):
         services = {}
-        path = quote('/v1/%s/%s/.services' % (self.auth_account, account))
+        path = quote('/v1/%s/%s/.services' % (self.auth_account_id, account))
         #print 'Gaurav get_token path', path
         resp = self.make_request(req.environ, 'GET',
                                  path).get_response(self.app)
@@ -1360,16 +1372,28 @@ class Swauth(object):
         services = json.loads(resp.body)
         return services
 
+    def create_account_id_mapping(self, req, account):
+        # Record the mapping from account id back to account name
+        account_suffix = str(uuid4())
+        path = quote('/v1/%s/.account_id/%s%s' %
+                     (self.auth_account_id, self.reseller_prefix, account_suffix))
+        resp = self.make_request(req.environ, 'PUT', path,
+                                 account).get_response(self.app)
+        if resp.status_int // 100 != 2:
+            raise Exception('Could not create account id mapping: %s %s' %
+                            (path, resp.status))
+
     def create_main_auth_account(self, req, account):
-        path = quote('/v1/%s/%s' % (self.auth_account, account))
+        #self.create_account_id_mapping(req, account)
+        path = quote('/v1/%s/%s' % (self.auth_account_id, account))
         resp = self.make_request(req.environ, 'HEAD',
                                  path).get_response(self.app)
         if resp.status_int == 404:
             resp = self.make_request(req.environ, 'PUT',
                                      path, headers={ \
                                               'X-Container-Meta-Account-Id': \
-                                              '%s%s' % (self.reseller_prefix, \
-                                               account)}).get_response(self.app)
+                                              '%s' % (get_account_id(account)) \
+                                               }).get_response(self.app)
             if resp.status_int // 100 != 2:
                 raise Exception('Could not create account within main auth '
                     'account: %s %s' % (path, resp.status))
@@ -1386,11 +1410,11 @@ class Swauth(object):
             
     def create_services(self, req, account):
         self.create_main_auth_account(req, account)
-        path = quote('/v1/%s/%s/.services' % (self.auth_account, account))
+        path = quote('/v1/%s/%s/.services' % (self.auth_account_id, account))
         #print 'Gaurav acc_put path', path
         services = {'storage': {}}
-        services['storage'][self.dsc_name] = '%s/%s%s' % (self.dsc_url,
-            self.reseller_prefix, account)
+        services['storage'][self.dsc_name] = '%s/%s' % (self.dsc_url,
+            get_account_id(account))
         services['storage']['default'] = self.dsc_name
         resp = self.make_request(req.environ, 'PUT', path,
                                  json.dumps(services)).get_response(self.app)
@@ -1409,6 +1433,7 @@ class Swauth(object):
         :param key: The key to validate for the user.
         :returns: True if the key is valid for the user, False if not.
         """
+        #TODO_AUTH
         return user_detail and self.auth_encoder().match(
           key, user_detail.get('auth'))
 

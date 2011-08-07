@@ -50,7 +50,6 @@ from swift.common.constraints import check_metadata, check_object_creation, \
     MAX_CONTAINER_NAME_LENGTH, MAX_FILE_SIZE
 from swift.common.exceptions import ChunkReadTimeout, \
     ChunkWriteTimeout, ConnectionTimeout
-from swift.common.utils import get_device_from_account
 from swift.common.utils import REPLICA_COUNT, DEFAULT_UID, DEFAULT_GID, global_headers, \
      OBJECT_SERVER_IP, CONTAINER_SERVER_IP, ACCOUNT_SERVER_IP
 from swift import plugins
@@ -581,7 +580,7 @@ class Controller(object):
         node = {
             'ip': OBJECT_SERVER_IP,
             'port': self.app.object_port,
-            'device': get_device_from_account(account)
+            'device': account
             }
         nodes.append(node)
         return nodes;
@@ -591,7 +590,7 @@ class Controller(object):
         node = {
             'ip': CONTAINER_SERVER_IP,
             'port': self.app.container_port,
-            'device': get_device_from_account(account)
+            'device': account
             }
         nodes.append(node)
         return nodes
@@ -601,7 +600,7 @@ class Controller(object):
         node = {
             'ip': ACCOUNT_SERVER_IP,
             'port': self.app.account_port,
-            'device': get_device_from_account(account)
+            'device': account
             }
         nodes.append(node)
         return nodes
