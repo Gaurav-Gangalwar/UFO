@@ -31,13 +31,13 @@ MAX_META_COUNT = 90
 #: Max overall size of metadata
 MAX_META_OVERALL_SIZE = 4096
 #: Max object name length
-MAX_OBJECT_NAME_LENGTH = 1024
+MAX_OBJECT_NAME_LENGTH = 255
 #: Max object list length of a get request for a container
 CONTAINER_LISTING_LIMIT = 10000
 #: Max container list length of a get request for an account
 ACCOUNT_LISTING_LIMIT = 10000
-MAX_ACCOUNT_NAME_LENGTH = 256
-MAX_CONTAINER_NAME_LENGTH = 256
+MAX_ACCOUNT_NAME_LENGTH = 255
+MAX_CONTAINER_NAME_LENGTH = 255
 
 
 def check_metadata(req, target_type):
@@ -138,8 +138,7 @@ def check_mount(root, drive):
     :param drive: drive name to be checked
     :returns: True if it is a valid mounted device, False otherwise
     """
-    if not drive.isalnum():
-        return False
+    #Drive name could be account name(AUTH_<id>)
     path = os.path.join(root, drive)
     return os.path.exists(path) and os.path.ismount(path)
 

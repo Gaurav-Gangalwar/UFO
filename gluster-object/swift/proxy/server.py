@@ -37,7 +37,7 @@ from eventlet.timeout import Timeout
 from webob.exc import HTTPBadRequest, HTTPMethodNotAllowed, \
     HTTPNotFound, HTTPPreconditionFailed, \
     HTTPRequestTimeout, HTTPServiceUnavailable, \
-    HTTPUnprocessableEntity, HTTPRequestEntityTooLarge, HTTPServerError, \
+    HTTPRequestEntityTooLarge, HTTPServerError, \
     status_map
 from webob import Request, Response
 
@@ -756,8 +756,8 @@ class ObjectController(Controller):
                 resp.headers['x-object-manifest'].split('/', 1)
             #lpartition, lnodes = self.app.container_ring.get_nodes(
                 #self.account_name, lcontainer)
-            partition = 0
-            nodes = self.get_object_nodes(self.account_name)
+            lpartition = 0
+            lnodes = self.get_container_nodes(self.account_name)
             marker = ''
             listing = []
             while True:

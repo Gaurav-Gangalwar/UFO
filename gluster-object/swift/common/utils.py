@@ -1291,7 +1291,8 @@ def get_account_details(acc_path):
 
     if os.path.isdir(acc_path):
             for name in os.listdir(acc_path):
-                if not os.path.isdir(acc_path + '/' + name):
+                if not os.path.isdir(acc_path + '/' + name) or \
+                   name.lower() == 'tmp':
                     continue
                 meta = read_metadata(acc_path + '/' + name)
                 if not meta:

@@ -58,7 +58,6 @@ from swift import plugins
 
 DATADIR = 'objects'
 ASYNCDIR = 'async_pending'
-MAX_OBJECT_NAME_LENGTH = 1024
 KEEP_CACHE_SIZE = (5 * 1024 * 1024)
 # keep these lower-case
 DISALLOWED_HEADERS = set('content-length content-type deleted etag'.split())
@@ -372,7 +371,10 @@ class DiskFile(object):
             if not os.path.isdir(os.path.join(self.datadir, self.obj)):
                 self.metadata = {}
                 self.data_file = None
+            else:
+                logging.error('Unable to delete dir %s' % os.path.join(self.datadir, self.obj))
             return
+        
         for fname in os.listdir(self.datadir):
             if fname == self.obj:
                 try:
@@ -634,6 +636,7 @@ class ObjectController(object):
             etag = etag.hexdigest()
             if 'etag' in request.headers and \
                             request.headers['etag'].lower() != etag:
+                logging.error('Etag mismatch %s %s %s' % (account, container, obj))
                 return HTTPUnprocessableEntity(request=request)
 
             content_type = request.headers['content-type']
@@ -668,6 +671,7 @@ class ObjectController(object):
                     header_caps = header_key.title()
                     metadata[header_caps] = request.headers[header_key]
             if not file_obj.put(fd, tmppath, metadata):
+                logging.error('Object put failed %s %s %s' % (account, container, obj))
                 return HTTPUnprocessableEntity(request=request)
         
         self.container_update('PUT', account, container, obj, request.headers,
@@ -842,7 +846,8 @@ class ObjectController(object):
         
             
         if file_obj.is_deleted():
-            return HTTPNotFound(request=request)
+            #If its already deleted just return success.
+            return HTTPNoContent(request=request)
         metadata = {
              X_TIMESTAMP: request.headers['X-Timestamp'],
              X_CONTENT_LENGTH: file_obj.metadata[X_CONTENT_LENGTH],
@@ -850,6 +855,7 @@ class ObjectController(object):
         
         file_obj.unlink()
         if not file_obj.is_deleted():
+            logging.error('Object is not deleted %s %s %s' % (account, container, obj))
             return HTTPUnprocessableEntity(request=request)
         self.container_update('DELETE', account, container, obj,
             request.headers, {'x-timestamp': metadata[X_TIMESTAMP],
