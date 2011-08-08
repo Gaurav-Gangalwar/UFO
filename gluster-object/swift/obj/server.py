@@ -846,8 +846,7 @@ class ObjectController(object):
         
             
         if file_obj.is_deleted():
-            #If its already deleted just return success.
-            return HTTPNoContent(request=request)
+            return HTTPNotFound(request=request)
         metadata = {
              X_TIMESTAMP: request.headers['X-Timestamp'],
              X_CONTENT_LENGTH: file_obj.metadata[X_CONTENT_LENGTH],
