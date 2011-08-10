@@ -1,6 +1,10 @@
 Gluster-Object is the "Unified File and Object Store", which we can use to
 access objects as files and files as objects on the glusterfs volume.
 
+It can work any distributed FS, provided the pluging for it.
+Right now it uses the plugin for Glusterfs by default, see
+gluster-object/swift/plugins.
+
 To use this you should have glusterfs installed.
 
 Steps to start gluster-object:->
@@ -11,7 +15,8 @@ Steps to start gluster-object:->
 At the completion of <..>_install.sh, gluster-object servers should be running on
 your system.
 
-It should start proxy, object, container and account servers, verify by ps -ef.
+It should start proxy, object, container and account servers and all config
+files should be get copied to /etc/gluster-object/
 
 Refer to doc section for user guide.
 
