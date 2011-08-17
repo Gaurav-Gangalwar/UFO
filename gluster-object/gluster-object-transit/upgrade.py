@@ -16,7 +16,6 @@ def restore_user_data():
     cmd = 'gluster-object-prep -K %s -A %s' %(ADMIN_KEY, ADMIN_URL)
     if os.system(cmd + '>>/dev/null'):
         raise Exception('%s failed, aborting upgrade.' %cmd)
-        exit(1)
 
     fp = file("user_info", 'r+')
 
@@ -82,6 +81,13 @@ def store_user_info():
                     fpi.writelines(user_details + '\n')
     fpi.close()
 
+
+def revert_changes():
+    cmd = 'mv %s/* %s ' %(TMP_DIR, AUTH_ACCOUNT)
+    os.system(cmd + '2>/dev/null')
+
+    cmd = 'mv %s/.* %s ' %(TMP_DIR, AUTH_ACCOUNT)
+    os.system(cmd + '2>/dev/null')
 
 def clear_existing_data():
     global TMP_DIR
@@ -157,8 +163,13 @@ def main():
     init()
     store_user_info()
     clear_existing_data()
-    restore_user_data()
-    restore_service_files()
+    try:
+        restore_user_data()
+        restore_service_files()
+    except Exception as inst:
+        print inst.args
+        print 'Reverting the changes'
+        revert_changes()
     unmount_tmp_dir()
 
 
