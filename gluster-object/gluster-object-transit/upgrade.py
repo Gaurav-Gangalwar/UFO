@@ -1,15 +1,22 @@
 #!/usr/bin/python
 
 import os, ast
+import simplejson as json
+from hashlib import md5
 from tempfile import mkdtemp
+from swift.common.utils import HASH_PATH_SUFFIX
 
 AUTH_ACCOUNT = ''
 ADMIN_URL = ''
 ADMIN_KEY = ''
+TMP_DIR = ''
 
 def restore_user_data():
+    print 'Upgrading data..'
     cmd = 'gluster-object-prep -K %s -A %s' %(ADMIN_KEY, ADMIN_URL)
-    os.system(cmd + '>>/dev/null')
+    if os.system(cmd + '>>/dev/null'):
+        raise Exception('%s failed, aborting upgrade.' %cmd)
+        exit(1)
 
     fp = file("user_info", 'r+')
 
@@ -19,8 +26,8 @@ def restore_user_data():
                                                          user_data)
        if len(user_data) == 0:
                break
-       print cmd
-       os.system(cmd + '>>/dev/null')
+       if os.system(cmd + '>>/dev/null'):
+           raise Exception('%s failed' %cmd)
     fp.close()
 
 
@@ -49,7 +56,6 @@ def get_account_list():
 def get_user_data(acc, user):
     fp = file(os.path.join(AUTH_ACCOUNT, acc, user))
     user_dt = fp.readline()
-    print acc + ':' + user + '=' + user_dt
     fp.close()
     return ast.literal_eval(user_dt)
 
@@ -57,6 +63,7 @@ def get_user_data(acc, user):
 def store_user_info():
     fpi = file('user_info', 'w+')
     accounts = get_account_list()
+    print 'Retrieving data..'
     for acc in accounts:
         if os.path.isdir(os.path.join(AUTH_ACCOUNT, acc)):
             for user in os.listdir(os.path.join(AUTH_ACCOUNT, acc)):
@@ -76,19 +83,61 @@ def store_user_info():
     fpi.close()
 
 
-def clear_existing_data()
-    cmd = 'rm -rf ' + AUTH_ACCOUNT
+def clear_existing_data():
+    global TMP_DIR
+
+    TMP_DIR = mkdtemp(dir='/tmp')
+
+    cmd = 'mv %s/* %s ' %(AUTH_ACCOUNT, TMP_DIR)
+    os.system(cmd + '2>/dev/null')
+
+    cmd = 'mv %s/.* %s ' %(AUTH_ACCOUNT, TMP_DIR)
     os.system(cmd + '2>/dev/null')
 
 
-def unmount_tmp_dir()
+def unmount_tmp_dir():
+    print 'Cleaning up temporary files and directories'
+
     mnt_cmd = 'umount ' + AUTH_ACCOUNT
 
-    if os.system(mnt_cmd)
+    if os.system(mnt_cmd):
         raise Exception('Unount failed on %s' % (AUTH_ACCOUNT))
 
     os.rmdir(AUTH_ACCOUNT)
 
+
+def encrypt(name):
+    return md5(name + HASH_PATH_SUFFIX).hexdigest()
+
+
+def upgrade_url(url):
+    import re
+    obj = re.match('(https://.*/v1/AUTH_)(.*)', url)
+    if obj == None:
+        print 'failed to upgrade services'
+    else:
+        print 'asdf:' + obj.groups()[1]
+        return obj.groups()[0] + encrypt(obj.groups()[1])
+
+
+def restore_service_files():
+    print 'Restoring the services..'
+    accounts = get_account_list()
+    for acc in accounts:
+        if os.path.isdir(os.path.join(TMP_DIR, acc)):
+            try:
+                fp = file(os.path.join(TMP_DIR, acc, '.services'), 'r+')
+                data = fp.readline()
+                data_dict = ast.literal_eval(data)
+                data_dict['storage']['local'] = upgrade_url(
+                                                data_dict['storage']['local'])
+                fp.close()
+
+                fp = file(os.path.join(AUTH_ACCOUNT, acc, '.services'), 'w+')
+                fp.write(json.dumps(data_dict))
+                fp.close()
+            except IOError:
+                pass
 
 def init():
     global AUTH_ACCOUNT
@@ -100,7 +149,7 @@ def init():
     AUTH_ACCOUNT = mkdtemp(dir='/tmp')
 
     mnt_cmd = 'mount -t glusterfs localhost:/auth %s' %AUTH_ACCOUNT
-    if os.system(mnt_cmd)
+    if os.system(mnt_cmd):
         raise Exception('Mount failed on %s' % (AUTH_ACCOUNT))
         exit(1)
 
@@ -110,6 +159,7 @@ def main():
     store_user_info()
     clear_existing_data()
     restore_user_data()
+    restore_service_files()
     unmount_tmp_dir()
 
 
