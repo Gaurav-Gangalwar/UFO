@@ -104,10 +104,11 @@ def check_object_creation(req, object_name):
     if 'X-Copy-From' in req.headers and req.content_length:
         return HTTPBadRequest(body='Copy requests require a zero byte body',
                               request=req, content_type='text/plain')
-    if len(object_name) > MAX_OBJECT_NAME_LENGTH:
-        return HTTPBadRequest(body='Object name length of %d longer than %d' %
-                (len(object_name), MAX_OBJECT_NAME_LENGTH), request=req,
-                content_type='text/plain')
+    for obj in object_name.split('/'):
+        if len(obj) > MAX_OBJECT_NAME_LENGTH:
+            return HTTPBadRequest(body='Object name length of %d longer than %d' %
+                    (len(obj), MAX_OBJECT_NAME_LENGTH), request=req,
+                    content_type='text/plain')
     if 'Content-Type' not in req.headers:
         return HTTPBadRequest(request=req, content_type='text/plain',
                     body='No content type')

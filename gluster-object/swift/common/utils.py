@@ -1184,7 +1184,11 @@ def validate_container(metadata):
         logging.error('No metadata')
         return False
     
-    if X_TYPE not in metadata.keys():
+    if X_TYPE not in metadata.keys() or \
+       X_TIMESTAMP not in metadata.keys() or \
+       X_PUT_TIMESTAMP not in metadata.keys() or \
+       X_OBJECTS_COUNT not in metadata.keys() or \
+       X_BYTES_USED not in metadata.keys():
         logging.error('Container error %s' % metadata)
         return False
 
@@ -1199,7 +1203,12 @@ def validate_account(metadata):
         logging.error('No metadata')
         return False
     
-    if X_TYPE not in metadata.keys():
+    if X_TYPE not in metadata.keys() or \
+       X_TIMESTAMP not in metadata.keys() or \
+       X_PUT_TIMESTAMP not in metadata.keys() or \
+       X_OBJECTS_COUNT not in metadata.keys() or \
+       X_BYTES_USED not in metadata.keys() or \
+       X_CONTAINER_COUNT not in metadata.keys():
         logging.error('Account error %s' % metadata)
         return False
 
@@ -1214,7 +1223,12 @@ def validate_object(metadata):
         logging.error('No metadata')
         return False
     
-    if X_TYPE not in metadata.keys():
+    if X_TIMESTAMP not in metadata.keys() or \
+       X_CONTENT_TYPE not in metadata.keys() or \
+       X_ETAG not in metadata.keys() or \
+       X_CONTENT_LENGTH not in metadata.keys() or \
+       X_TYPE not in metadata.keys() or \
+       X_OBJECT_TYPE not in metadata.keys():
         logging.error('Object error %s' % metadata)
         return False
 
