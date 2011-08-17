@@ -116,7 +116,6 @@ def upgrade_url(url):
     if obj == None:
         print 'failed to upgrade services'
     else:
-        print 'asdf:' + obj.groups()[1]
         return obj.groups()[0] + encrypt(obj.groups()[1])
 
 
