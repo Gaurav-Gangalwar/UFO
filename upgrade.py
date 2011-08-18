@@ -20,13 +20,16 @@ def restore_user_data():
     fp = file("user_info", 'r+')
 
     while True:
-       user_data = fp.readline()
-       cmd = 'gluster-object-add-user -K %s -A %s %s' %(ADMIN_KEY, ADMIN_URL,
+        user_data = fp.readline()
+        user_data = user_data.strip('\n')
+        cmd = 'gluster-object-add-user -K %s -A %s %s' %(ADMIN_KEY, ADMIN_URL,\
                                                          user_data)
-       if len(user_data) == 0:
-               break
-       if os.system(cmd + '>>/dev/null'):
-           raise Exception('%s failed' %cmd)
+        if len(user_data) == 0:
+            break
+        
+        if os.system(cmd + '>>/dev/null'):
+            raise Exception('%s failed' %cmd)
+        
     fp.close()
 
 
@@ -55,6 +58,7 @@ def get_account_list():
 def get_user_data(acc, user):
     fp = file(os.path.join(AUTH_ACCOUNT, acc, user))
     user_dt = fp.readline()
+    user_dt = user_dt.strip('\n')
     fp.close()
     return ast.literal_eval(user_dt)
 
@@ -75,6 +79,10 @@ def store_user_info():
                             user_details += '-a '
                         if dict['name'] == '.reseller_admin':
                             user_details += '-r '
+                    if int(user_data['uid']) == -1:
+                        user_data['uid'] = ''
+                    if int(user_data['gid']) == -1:
+                        user_data['gid'] = ''
                     user_details = user_details + ' '.join([acc, user,
                                     user_data['auth'].replace('plaintext:', ''),
                                     user_data['uid'], user_data['gid']])
@@ -133,6 +141,7 @@ def restore_service_files():
             try:
                 fp = file(os.path.join(TMP_DIR, acc, '.services'), 'r+')
                 data = fp.readline()
+                data = data.strip('\n')
                 data_dict = ast.literal_eval(data)
                 data_dict['storage']['local'] = upgrade_url(
                                                 data_dict['storage']['local'])
@@ -180,7 +189,8 @@ def main():
         print inst.args
         print 'Reverting the changes, retry or do manual upgrade.'
         revert_changes()
-    unmount_tmp_dir()
+    finally:
+        unmount_tmp_dir()
 
 
 if __name__ == '__main__':
