@@ -19,7 +19,7 @@ sudo mkdir -p /usr/local/gluster-object/config 2>> /dev/null
 sudo rm -rf /usr/local/gluster-object/config/*
 sudo cp gluster-object/config/* /usr/local/gluster-object/config/
 cd gluster-object
-sudo python2.6 setup.py install
+sudo python setup.py install
 sudo gluster-object-config
 sudo gluster-object-stop
 sudo gluster-object-start
