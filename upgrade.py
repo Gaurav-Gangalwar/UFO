@@ -149,7 +149,9 @@ def init():
     global ADMIN_URL
     global ADMIN_KEY
 
-    ADMIN_URL = raw_input('Enter the ADMIN_URL:')
+    ADMIN_URL = raw_input('Enter the ADMIN_URL(Press Enter for default https://127.0.0.1:443/auth):')
+    if not ADMIN_URL:
+        ADMIN_URL = 'https://127.0.0.1:443/auth'
     ADMIN_KEY = raw_input('Enter the ADMIN_KEY:')
     AUTH_ACCOUNT = mkdtemp(dir='/tmp')
 
@@ -176,7 +178,7 @@ def main():
         restore_service_files()
     except Exception as inst:
         print inst.args
-        print 'Reverting the changes'
+        print 'Reverting the changes, retry or do manual upgrade.'
         revert_changes()
     unmount_tmp_dir()
 
