@@ -181,8 +181,8 @@ def encrypt(name):
 def upgrade_url(url):
     import re
     obj = re.match('(https://.*/v1/AUTH_)(.*)', url)
-    if obj == None:
-        print 'failed to upgrade services'
+    if obj == None or (obj.groups()[1] not in get_account_list()):
+        raise Exception('failed to upgrade services')
     else:
         return obj.groups()[0] + encrypt(obj.groups()[1])
 
