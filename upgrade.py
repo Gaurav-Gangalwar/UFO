@@ -27,6 +27,7 @@ def restore_user_data():
 
     while True:
        user_data = fp.readline()
+       user_data = user_data.strip('\n')
        cmd = 'gluster-object-add-user -K %s -A %s %s' %(ADMIN_KEY, ADMIN_URL,
                                                          user_data)
        if len(user_data) == 0:
@@ -61,6 +62,7 @@ def get_account_list():
 def get_user_data(acc, user):
     fp = file(os.path.join(AUTH_ACCOUNT, acc, user))
     user_dt = fp.readline()
+    user_dt = user_dt.strip('\n')
     fp.close()
     return ast.literal_eval(user_dt)
 
@@ -81,6 +83,10 @@ def store_user_info():
                             user_details += '-a '
                         if dict['name'] == '.reseller_admin':
                             user_details += '-r '
+                    if int(user_data['uid']) == -1:
+                        user_data['uid'] = ''
+                    if int(user_data['gid']) == -1:
+                        user_data['gid'] = ''
                     user_details = user_details + ' '.join([acc, user,
                                     user_data['auth'].replace('plaintext:', ''),
                                     user_data['uid'], user_data['gid']])
@@ -211,7 +217,9 @@ def init():
     global ADMIN_URL
     global ADMIN_KEY
 
-    ADMIN_URL = raw_input('Enter the ADMIN_URL:')
+    ADMIN_URL = raw_input('Enter the ADMIN_URL(Press Enter for default https://127.0.0.1:443/auth):')
+    if not ADMIN_URL:
+        ADMIN_URL = 'https://127.0.0.1:443/auth'
     ADMIN_KEY = raw_input('Enter the ADMIN_KEY:')
     AUTH_ACCOUNT = mkdtemp(dir='/tmp')
 
@@ -222,6 +230,15 @@ def init():
 
 
 def main():
+    print '!!!UNSTABLE'
+    print 'This script will upgrade auth info of Beta1 to Beta2,' \
+          ' continue only if you were using Beta1 and installed Beta2. \n'\
+          'You should be using the same auth volume for using the' \
+          ' existing auth data. In case of any failure old auth data \n' \
+          'will be reverted back and you are supposed to clean and recreate it manually.'
+    proceed = raw_input('Press c to continue:')
+    if proceed != 'c':
+        exit(1)
     init()
     store_user_info()
     clear_existing_data()
@@ -230,9 +247,10 @@ def main():
         restore_service_files()
     except Exception as inst:
         print inst.args
-        print 'Reverting the changes'
+        print 'Reverting the changes, retry or do manual upgrade.'
         revert_changes()
-    unmount_tmp_dir()
+    finally:
+        unmount_tmp_dir()
 
 
 if __name__ == '__main__':
