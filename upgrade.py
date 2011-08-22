@@ -1,3 +1,4 @@
+#!/usr/bin/python
 # Copyright (c) 2011 Gluster, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,8 +13,6 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-#!/usr/bin/python
 
 import os, ast
 import simplejson as json
@@ -260,6 +259,7 @@ def main():
     try:
         restore_user_data()
         restore_service_files()
+        print 'Successfully upgraded auth data to Beta2.'
     except Exception as inst:
         print inst.args
         print 'Reverting the changes, retry or do manual upgrade.'
