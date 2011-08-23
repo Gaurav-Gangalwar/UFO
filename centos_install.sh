@@ -18,8 +18,14 @@ gluster-object-stop 2>> /dev/null
 rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/x86_64/epel-release-5-4.noarch.rpm
 yum install memcached
 yum install openssl
-yum install python26
-yum install python26-devel
+dest_dir="/usr/lib/python2.6/site-packages/"
+if ! test -d $dest_dir
+then
+        echo "Installing Python2.6."
+        yum install python26
+        yum install python26-devel
+fi
+
 yum install python26-setuptools
 easy_install-2.6 xattr netifaces eventlet greenlet paste pastedeploy configobj coverage  webob simplejson nose
 mkdir -p /usr/local/gluster-object/config 2>> /dev/null
