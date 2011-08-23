@@ -20,7 +20,6 @@ yum install memcached
 yum install openssl
 yum install python26
 yum install python26-devel
-rm -rf /usr/lib/python2.6/site-packages/* >> /dev/null
 cp -r usr/lib/python2.6/site-packages/* /usr/lib/python2.6/site-packages/ >> /dev/null
 mkdir -p /usr/local/gluster-object/config 2>> /dev/null
 rm -rf /usr/local/gluster-object/config/*
