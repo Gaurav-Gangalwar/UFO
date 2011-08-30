@@ -1,9 +1,9 @@
 #########################################################################
 # Command to build rpms.                                                #
-#   $ rpmbuild -ba --buildroot=/home/makerpm/build/ROOT/ ufo.spec       #
+#   $ rpmbuild -bb --buildroot=/home/makerpm/build/ROOT/ ufo.spec       #
 #########################################################################
 # Setting up the environment.                                           #
-#   * sh ssa_install.sh                                                 #
+#   * sh centos_install.sh                                              #
 #   * yum groupinstall "Development Tools"                              #
 #   * yum install rpmdevtools                                           #
 #   * rpmdev-setuptree                                                  #
@@ -27,22 +27,20 @@ Group: Application/File
 Vendor: Gluster Inc.
 Packager: gluster-users@gluster.org
 License: Apache
+BuildArch: noarch
 
 %description
-GlusterFS is a clustered file-system capable of scaling to several
-peta-bytes. It aggregates various storage bricks over Infiniband RDMA
-or TCP/IP interconnect into one large parallel network file
-system. GlusterFS is one of the most sophisticated file system in
-terms of features and extensibility.  It borrows a powerful concept
-called Translators from GNU Hurd kernel. Much of the code in GlusterFS
-is in userspace and easily manageable.
+Gluster’s Unified File and Object Storage unifies NAS and object storage
+technology. This provides a system for data storage that enables users to access
+the same data as an object and as a file, simplifying management and controlling
+storage costs.
 
 %package ufo
 Summary: Glusterfs UFO
 Group: Application/File
 Requires: memcached
 Requires: openssl
-Requires: python26
+Requires: python
 
 %description ufo
 Gluster’s Unified File and Object Storage unifies NAS and object storage
@@ -56,7 +54,7 @@ mkdir -p %{buildroot}/%{_libdir}/python2.6/site-packages
 mkdir -p %{buildroot}/%{_localdir}/%{_objdir}/config
 mkdir -p %{buildroot}/%{_bindir}
 
-cp -r %{_libdir}/python2.6/site-packages/* %{buildroot}/%{_libdir}/python2.6/site-packages
+cp -r %{_libdir}/python2.6/site-packages/*.egg %{buildroot}/%{_libdir}/python2.6/site-packages
 cp -r %{_localdir}/%{_objdir}/config/* %{buildroot}/%{_localdir}/%{_objdir}/config
 cp -rv %{_bindir}/gluster-object-* %{buildroot}/%{_bindir}
 
