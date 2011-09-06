@@ -54,7 +54,7 @@ mkdir -p %{buildroot}/%{_libdir}/python2.6/site-packages
 mkdir -p %{buildroot}/%{_localdir}/%{_objdir}/config
 mkdir -p %{buildroot}/%{_bindir}
 
-cp -r %{_libdir}/python2.6/site-packages/*.egg %{buildroot}/%{_libdir}/python2.6/site-packages
+cp -r %{_libdir}/python2.6/site-packages/* %{buildroot}/%{_libdir}/python2.6/site-packages
 cp -r %{_localdir}/%{_objdir}/config/* %{buildroot}/%{_localdir}/%{_objdir}/config
 cp -rv %{_bindir}/gluster-object-* %{buildroot}/%{_bindir}
 
@@ -65,7 +65,7 @@ mkdir -p %{_conf_dir}/gluster-object
 
 %files ufo
 %defattr(-,root,root)
-%{_libdir}/python2.6/site-packages
+%{_libdir}/python2.6/site-packages/*
 %{_localdir}/%{_objdir}/config
 %{_bindir}/*
 
