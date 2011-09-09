@@ -51,7 +51,6 @@ from swift import plugins
 
 DATADIR = 'containers'
 
-
 class DiskDir(object):
     """
     Manage object files on disk.
@@ -66,7 +65,8 @@ class DiskDir(object):
     :param disk_chunk_Size: size of chunks on file reads
     """
 
-    def __init__(self, path, device, partition, account, container, logger, uid=DEFAULT_UID, gid=DEFAULT_GID):
+    def __init__(self, path, device, partition, account, container, logger,
+                 memcache=None, uid=DEFAULT_UID, gid=DEFAULT_GID):
         if container:
             self.name = container
         else:
@@ -76,13 +76,12 @@ class DiskDir(object):
                             storage_directory(DATADIR, partition, self.name))
         else:
             self.datadir = os.path.join(path, device)
-            
-        
         self.device_path = os.path.join(path, device)
         self.logger = logger
         self.metadata = {}
         self.uid = int(uid)
         self.gid = int(gid)
+        self.memcache = memcache
         self.dir_exists = os.path.isdir (self.datadir)
         if self.dir_exists:
             self.metadata = read_metadata(self.datadir)
@@ -90,7 +89,7 @@ class DiskDir(object):
             return
         if container:
             if not self.metadata:
-                create_container_metadata(self.datadir)
+                create_container_metadata(self.datadir, memcache=self.memcache)
                 self.metadata = read_metadata(self.datadir)
             ret = validate_container(self.metadata)
         else:
@@ -102,8 +101,7 @@ class DiskDir(object):
         if not ret:
             self.dir_exists = False
             self.metadata = {}
-            
-            
+
     def empty(self):
         return dir_empty(self.datadir)
 
@@ -120,7 +118,7 @@ class DiskDir(object):
         """
         Returns Object-Count and Bytes-Used.
         """
-        
+
         if not os.path.isdir(self.datadir):
             return
 
@@ -131,7 +129,6 @@ class DiskDir(object):
 
         return files_count, dir_bytes_used
 
-        
 
     def put_metadata(self, metadata):
         """
@@ -139,7 +136,7 @@ class DiskDir(object):
         """
         write_metadata(self.datadir, metadata)
         self.metadata = metadata
-        
+
     def put(self, metadata):
         """
         Create and write metatdata to directory/container.
@@ -184,14 +181,13 @@ class DiskDir(object):
         self.metadata[X_CONTAINER_COUNT] = int(self.metadata[X_CONTAINER_COUNT]) - 1
         self.put_metadata(self.metadata)
 
-  
     def unlink(self):
         """
         Remove directory/container if empty.
         """
         if dir_empty(self.datadir):
             rmdirs(self.datadir)
-            
+
     def filter_prefix(self, objects, prefix):
         """
         Accept sorted list.
@@ -235,7 +231,7 @@ class DiskDir(object):
         for object_name in objects:
             if object_name > marker:
                 filtered_objs.append(object_name)
-         
+
         return filtered_objs
 
     def filter_end_marker(self, objects, end_marker):
@@ -269,38 +265,39 @@ class DiskDir(object):
         if delimiter and not prefix:
             prefix = ''
 
-        print 'Container_list prefix, del', prefix,\
-                                                   delimiter
+        print 'Container_list prefix, del, datadir', prefix,\
+                                                   delimiter, self.datadir
         objects = []
         object_count = 0
         bytes_used = 0
         container_list = []
-        
-        objects, object_count, bytes_used = get_container_details(self.datadir)
+
+        objects, object_count, bytes_used = get_container_details(self.datadir,
+                                                                  self.memcache)
 
         #print 'cont', object_count, self.metadata
-        
+
         if int(self.metadata[X_OBJECTS_COUNT]) != object_count or \
            int(self.metadata[X_BYTES_USED]) != bytes_used:
             self.metadata[X_OBJECTS_COUNT] = object_count
             self.metadata[X_BYTES_USED] = bytes_used
             self.update_container(self.metadata)
-            
+
         if objects:
             objects.sort()
-            
+
         if objects and prefix:
             objects = self.filter_prefix(objects, prefix)
 
         if objects and delimiter:
             objects = self.filter_delimiter(objects, delimiter, prefix)
-                        
+
         if objects and marker:
             objects = self.filter_marker(objects, marker)
 
         if objects and end_marker:
             objects = self.filter_end_marker(objects, end_marker)
-            
+
         if objects and limit:
             if len(objects) > limit:
                 objects = self.filter_limit(objects, limit)
@@ -334,26 +331,26 @@ class DiskDir(object):
         account_list = []
 
         containers, container_count = get_account_details(self.datadir)
-                                  
+
         if int(self.metadata[X_CONTAINER_COUNT]) != container_count:
             self.metadata[X_CONTAINER_COUNT] = container_count
             self.update_account(self.metadata)
-                                  
+
         if containers:
             containers.sort()
-            
+
         if containers and prefix:
             containers = self.filter_prefix(containers, prefix)
 
         if containers and delimiter:
             containers = self.filter_delimiter(containers, delimiter, prefix)
-                        
+
         if containers and marker:
             containers = self.filter_marker(containers, marker)
 
         if containers and end_marker:
             containers = self.filter_end_marker(containers, end_marker)
-            
+
         if containers and limit:
             if len(containers) > limit:
                 containers = self.filter_limit(containers, limit)
@@ -363,6 +360,7 @@ class DiskDir(object):
                 list_item = []
                 list_item.append(cont)
                 metadata = read_metadata(self.datadir + '/' + cont)
+
                 if metadata:
                     list_item.append(metadata[X_OBJECTS_COUNT])
                     list_item.append(metadata[X_BYTES_USED])
@@ -372,12 +370,10 @@ class DiskDir(object):
         #print 'Gaurav list_containet objs', objects
         return account_list
 
-        
     def update_container(self, metadata):
         cont_path = self.datadir
         write_metadata(cont_path, metadata)
         self.metadata = metadata
-                
 
     def update_account(self, metadata):
         acc_path = self.datadir
@@ -388,10 +384,11 @@ class DiskDir(object):
         objects = []
         object_count = 0
         bytes_used = 0
-        objects, object_count, bytes_used = get_container_details(self.datadir)
+        objects, object_count, bytes_used = get_container_details(self.datadir,
+                                                                  self.memcache)
 
         #print 'cont', object_count, self.metadata
-        
+
         if int(self.metadata[X_OBJECTS_COUNT]) != object_count or \
            int(self.metadata[X_BYTES_USED]) != bytes_used:
             self.metadata[X_OBJECTS_COUNT] = object_count
@@ -401,15 +398,12 @@ class DiskDir(object):
     def update_container_count(self):
         containers = []
         container_count = 0
-        
+
         containers, container_count = get_account_details(self.datadir)
-                                  
+
         if int(self.metadata[X_CONTAINER_COUNT]) != container_count:
             self.metadata[X_CONTAINER_COUNT] = container_count
             self.update_account(self.metadata)
-                                  
-        
-
 
 
 class ContainerController(object):
@@ -502,7 +496,8 @@ class ContainerController(object):
             if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
         #broker = self._get_container_broker(drive, part, account, container)
-        dir_obj = DiskDir(self.root, drive, part, account, container, self.logger)
+        dir_obj = DiskDir(self.root, drive, part, account, container,
+                          self.logger, memcache = self.memcache)
         existed = dir_obj.dir_exists
         if not dir_obj.dir_exists:
             return HTTPNotFound()
@@ -548,10 +543,12 @@ class ContainerController(object):
         #TODO: Store this timestamp as created time if container doesn't exists.
         if not obj:
             dir_obj = DiskDir(self.root, drive, part, account, container, self.logger, \
-                              uid = req.headers['uid'], gid = req.headers['gid'])
+                              memcache = self.memcache, uid = req.headers['uid'],
+                              gid = req.headers['gid'])
         else:
-            dir_obj = DiskDir(self.root, drive, part, account, container, self.logger)
-            
+            dir_obj = DiskDir(self.root, drive, part, account, container,
+                              self.logger, memcache = self.memcache)
+
         created = not dir_obj.dir_exists
         if obj: #put object in container
             if dir_obj.dir_exists:
@@ -573,7 +570,7 @@ class ContainerController(object):
                    key.lower().startswith('x-container-meta-'))
 
             #print 'Gaurav Container PUT meta', metadata
-                
+
             if metadata:
                 dir_obj.put(metadata)
 
@@ -581,8 +578,6 @@ class ContainerController(object):
                 resp = self.account_update(req, account, container, dir_obj)
                 if resp:
                     return resp
-        
-        
         if created:
             return HTTPCreated(request=req)
         else:
@@ -599,13 +594,14 @@ class ContainerController(object):
         if self.mount_check and not check_mount(self.root, drive):
             if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
-        
-        dir_obj = DiskDir(self.root, drive, part, account, container, self.logger)
+
+        dir_obj = DiskDir(self.root, drive, part, account, container,
+                          self.logger, memcache = self.memcache)
         if not dir_obj.dir_exists:
             return HTTPNotFound(request=req)
-        
+
         dir_obj.update_object_count()
-        
+
         headers = {
             'X-Container-Object-Count': dir_obj.metadata[X_OBJECTS_COUNT],
             'X-Container-Bytes-Used': dir_obj.metadata[X_BYTES_USED],
@@ -629,16 +625,17 @@ class ContainerController(object):
         if self.mount_check and not check_mount(self.root, drive):
             if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
-        
-        dir_obj = DiskDir(self.root, drive, part, account, container, self.logger)
+
+        dir_obj = DiskDir(self.root, drive, part, account, container,
+                          self.logger, memcache = self.memcache)
         if not dir_obj.dir_exists:
             return HTTPNotFound(request=req)
-        
+
         try:
             path = get_param(req, 'path')
             prefix = get_param(req, 'prefix')
             delimiter = get_param(req, 'delimiter')
-            #print 'Gaurav Obj_Get path, prefix, del', path, prefix, delimiter 
+            #print 'Gaurav Obj_Get path, prefix, del', path, prefix, delimiter
             if delimiter and (len(delimiter) > 1 or ord(delimiter) > 254):
                 # delimiters can be made more flexible later
                 return HTTPPreconditionFailed(body='Bad delimiter')
@@ -663,6 +660,7 @@ class ContainerController(object):
                                 default_match='text/plain')
         container_list = dir_obj.list_container_objects(limit, marker, end_marker,
                                                   prefix, delimiter, path)
+
         if out_content_type == 'application/json':
             json_pattern = ['"name":%s', '"hash":"%s"', '"bytes":%s',
                             '"content_type":%s, "last_modified":"%s"']
@@ -721,7 +719,7 @@ class ContainerController(object):
 
         if not container_list:
             return HTTPNoContent(request=req, headers=resp_headers)
-        
+
         ret = Response(body=container_list, request=req, headers=resp_headers)
         ret.content_type = out_content_type
         ret.charset = 'utf-8'
@@ -730,7 +728,7 @@ class ContainerController(object):
     def REPLICATE(self, req):
         #TODO: remove this code.
         logging.error("Replicate Not used")
-        
+
 
     def POST(self, req):
         """Handle HTTP POST request."""
@@ -746,7 +744,8 @@ class ContainerController(object):
         if self.mount_check and not check_mount(self.root, drive):
             if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % drive)
-        dir_obj = DiskDir(self.root, drive, part, account, container, self.logger)
+        dir_obj = DiskDir(self.root, drive, part, account, container,
+                          self.logger, memcache = self.memcache)
         if not dir_obj.dir_exists:
             return HTTPNotFound(request=req)
         timestamp = normalize_timestamp(req.headers['x-timestamp'])
@@ -761,6 +760,7 @@ class ContainerController(object):
         return HTTPNoContent(request=req)
 
     def __call__(self, env, start_response):
+        self.memcache = env ['swift.cache']
         start_time = time.time()
         req = Request(env)
         self.logger.txn_id = req.headers.get('x-trans-id', None)
