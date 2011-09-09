@@ -654,14 +654,6 @@ class ObjectController(object):
             
             if request.headers['content-type'].lower() == DIR_TYPE:
                 metadata.update({X_OBJECT_TYPE: MARKER_DIR})
-                print 'PUT obj marker %s, type %s, size %s' % (request.path, \
-                                                    request.headers['content-type'], \
-                                                    request.headers['content-length'])
-                                                    
-            if request.headers['content-length'] == 0:
-                print 'PUT obj len=0 %s, type %s, size %s' % (request.path, \
-                                                    request.headers['content-type'], \
-                                                    request.headers['content-length'])
                 
             metadata.update(val for val in request.headers.iteritems()
                     if val[0].lower().startswith('x-object-meta-') and
@@ -797,8 +789,6 @@ class ObjectController(object):
                               (file_obj.datadir, file_obj.obj))
             return HTTPNotFound(request=request)
 
-        
-            
         if file_obj.is_deleted():
             return HTTPNotFound(request=request)
         try:
@@ -842,9 +832,7 @@ class ObjectController(object):
             logging.error('Invalid dir obj name %s %s' % \
                               (file_obj.datadir, file_obj.obj))
             return HTTPNotFound(request=request)
-        
-        
-            
+
         if file_obj.is_deleted():
             return HTTPNotFound(request=request)
         metadata = {

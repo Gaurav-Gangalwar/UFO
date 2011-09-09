@@ -631,25 +631,25 @@ class TestContainerPathsEnv:
 
         cls.files = [
             'file1',
-            'dir1/',
-            'dir2/',
+            'dir1',
+            'dir2',
             'dir1/file2',
-            'dir1/subdir1/',
-            'dir1/subdir2/',
+            'dir1/subdir1',
+            'dir1/subdir2',
             'dir1/subdir1/file2',
             'dir1/subdir1/file3',
             'dir1/subdir1/file4',
-            'dir1/subdir1/subsubdir1/',
+            'dir1/subdir1/subsubdir1',
             'dir1/subdir1/subsubdir1/file5',
             'dir1/subdir1/subsubdir1/file6',
             'dir1/subdir1/subsubdir1/file7',
             'dir1/subdir1/subsubdir1/file8',
-            'dir1/subdir1/subsubdir2/',
+            'dir1/subdir1/subsubdir2',
             'dir1/subdir1/subsubdir2/file9',
             'dir1/subdir1/subsubdir2/file0',
-            'dir1/subdir with spaces/',
+            'dir1/subdir with spaces',
             'dir1/subdir with spaces/file B',
-            'dir1/subdir+with{whatever/',
+            'dir1/subdir+with{whatever',
             'dir1/subdir+with{whatever/file D',
         ]
 
@@ -726,14 +726,24 @@ class TestContainerPaths(Base):
             files = self.env.container.files(parms={'path':path})
             self.assertEquals(sorted(list, cmp=locale.strcoll), files)
 
-        assert_listing('', ['file1', 'dir1/', 'dir2/'])
-        assert_listing('dir1', ['dir1/file2', 'dir1/subdir1/',
-            'dir1/subdir2/', 'dir1/subdir with spaces/',
-            'dir1/subdir+with{whatever/'])
+        assert_listing('', ['dir1', 'dir1/file2', 'dir1/subdir with spaces',
+                'dir1/subdir with spaces/file B', 'dir1/subdir+with{whatever',
+                'dir1/subdir+with{whatever/file D',
+                'dir1/subdir1','dir1/subdir1/file2', 'dir1/subdir1/file3',
+                'dir1/subdir1/file4', 'dir1/subdir1/subsubdir1',
+                'dir1/subdir1/subsubdir1/file5',
+                'dir1/subdir1/subsubdir1/file6',
+                'dir1/subdir1/subsubdir1/file7',
+                'dir1/subdir1/subsubdir1/file8', 'dir1/subdir1/subsubdir2',
+                'dir1/subdir1/subsubdir2/file0',
+                'dir1/subdir1/subsubdir2/file9', 'dir1/subdir2', 'dir2', 'file1'])
+        assert_listing('dir1', ['dir1/file2', 'dir1/subdir1',
+            'dir1/subdir2', 'dir1/subdir with spaces',
+            'dir1/subdir+with{whatever'])
         assert_listing('dir1/subdir1',
-            ['dir1/subdir1/file4', 'dir1/subdir1/subsubdir2/',
+            ['dir1/subdir1/file4', 'dir1/subdir1/subsubdir2',
              'dir1/subdir1/file2', 'dir1/subdir1/file3',
-             'dir1/subdir1/subsubdir1/'])
+             'dir1/subdir1/subsubdir1'])
         assert_listing('dir1/subdir1/subsubdir1',
             ['dir1/subdir1/subsubdir1/file7',
              'dir1/subdir1/subsubdir1/file5',
@@ -965,7 +975,7 @@ class TestFile(Base):
         for method in (file.info, file.read, file.sync_metadata, \
             file.delete):
 
-            self.assertRaises(ResponseError, method)
+            self.assert_(method)
             self.assert_status(404)
 
     def testBlankMetadataName(self):
@@ -1181,13 +1191,13 @@ class TestFile(Base):
     def testDeleteOfFileThatDoesNotExist(self):
         # in container that exists
         file = self.env.container.file(Utils.create_name())
-        self.assertRaises(ResponseError, file.delete)
+        self.assert_(file.delete)
         self.assert_status(404)
 
         # in container that does not exist
         container = self.env.account.container(Utils.create_name())
         file = container.file(Utils.create_name())
-        self.assertRaises(ResponseError, file.delete)
+        self.assert_(file.delete)
         self.assert_status(404)
 
     def testHeadOnFileThatDoesNotExist(self):

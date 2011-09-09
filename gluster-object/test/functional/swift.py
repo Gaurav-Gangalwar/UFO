@@ -690,7 +690,8 @@ class File(Base):
             self.conn.put_data(data, True)
         elif self.chunked_write_in_progress:
             self.chunked_write_in_progress = False
-            return self.conn.put_end(True) == 201
+            stat = self.conn.put_end(True)
+            return stat == 201
         else:
             raise RuntimeError
 
