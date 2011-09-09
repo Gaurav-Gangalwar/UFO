@@ -82,10 +82,6 @@ class DiskDir(object):
         self.uid = int(uid)
         self.gid = int(gid)
         self.memcache = memcache
-        if self.memcache:
-            print 'memcache is present'
-        else:
-            print 'memcache is not present'
         self.dir_exists = os.path.isdir (self.datadir)
         if self.dir_exists:
             self.metadata = read_metadata(self.datadir)
@@ -664,7 +660,6 @@ class ContainerController(object):
                                 default_match='text/plain')
         container_list = dir_obj.list_container_objects(limit, marker, end_marker,
                                                   prefix, delimiter, path)
-        print container_list
 
         if out_content_type == 'application/json':
             json_pattern = ['"name":%s', '"hash":"%s"', '"bytes":%s',

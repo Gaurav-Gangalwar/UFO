@@ -123,6 +123,10 @@ if hash_conf.read('/etc/gluster-object/gluster-object.conf'):
     except (NoSectionError, NoOptionError):
         pass
 
+_fs_conf = ConfigParser()
+_fs_conf.read(os.path.join('/etc/gluster-object', 'fs.conf'))
+_mount_path = _fs_conf.get('DEFAULT', 'mount_path', '/mnt/gluster-object')
+
 # Used when reading config values
 TRUE_VALUES = set(('true', '1', 'yes', 'on', 't', 'y'))
 
@@ -134,11 +138,11 @@ def validate_configuration():
         sys.exit("Error: [swift-hash]: swift_hash_path_suffix missing "
                  "from /etc/gluster-object/gluster-object.conf")
 
-def strip_obj_storage_path(path, string='/mnt/gluster-object'):
+def strip_obj_storage_path(path, string=_mount_path):
         """
         strip /mnt/gluster-object
         """
-        return path.replace(string, '').strip('/').rstrip('/')
+        return path.replace(string, '').strip('/')
 
 def load_libc_function(func_name):
     """
@@ -1284,12 +1288,14 @@ def update_list(path, const_path, dirs=[], files=[], object_count=0,
                                              obj_list)
     return object_count, bytes_used
 
-def get_container_details_from_fs(cont_path, const_path, object_count=0,
-                                  bytes_used=0, obj_list=[], memcache=None):
+def get_container_details_from_fs(cont_path, const_path,
+                                  memcache=None):
     """
     get container details by traversing the filesystem
     """
-    import sys
+    bytes_used = 0
+    object_count = 0
+    obj_list=[]
     dir_list = []
 
     if os.path.isdir(cont_path):
@@ -1309,22 +1315,26 @@ def get_container_details_from_fs(cont_path, const_path, object_count=0,
 
     return obj_list, object_count, bytes_used
 
-def get_container_details_from_memcache(cont_path, const_path, object_count=0, bytes_used=0,
-                                        obj_list=[], memcache=None):
+def get_container_details_from_memcache(cont_path, const_path,
+                                        memcache):
     """
     get container details stored in memcache
     """
 
+    bytes_used = 0
+    object_count = 0
+    obj_list=[]
+
     dir_contents = memcache.get(strip_obj_storage_path(cont_path) + '-dir_list')
     if not dir_contents:
         return get_container_details_from_fs(cont_path, const_path,
-                                             obj_list=obj_list, memcache=memcache)
+                                             memcache=memcache)
 
     for i in dir_contents.split(','):
         path, mtime = i.split(':')
         if mtime != str(os.lstat(path).st_mtime):
             return get_container_details_from_fs(cont_path, const_path,
-                                                 obj_list=obj_list, memcache=memcache)
+                                                 memcache=memcache)
 
     obj_list = memcache.get(strip_obj_storage_path(cont_path))
 
@@ -1336,17 +1346,11 @@ def get_container_details(cont_path, memcache=None):
     """
     Return object_list, object_count and bytes_used.
     """
-    object_list = []
-    object_count = 0
-    bytes_used = 0
-
     if memcache:
         object_list, object_count, bytes_used = get_container_details_from_memcache(cont_path, cont_path,
-                                                                                    obj_list=object_list,
                                                                                     memcache=memcache)
     else:
-        object_list, object_count, bytes_used = get_container_details_from_fs(cont_path, cont_path,
-                                                                              obj_list=object_list)
+        object_list, object_count, bytes_used = get_container_details_from_fs(cont_path, cont_path)
 
     return object_list, object_count, bytes_used
 
