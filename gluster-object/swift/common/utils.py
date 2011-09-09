@@ -123,6 +123,10 @@ if hash_conf.read('/etc/gluster-object/gluster-object.conf'):
     except (NoSectionError, NoOptionError):
         pass
 
+_fs_conf = ConfigParser()
+_fs_conf.read(os.path.join('/etc/gluster-object', 'fs.conf'))
+_mount_path = _fs_conf.get('DEFAULT', 'mount_path', '/mnt/gluster-object')
+
 # Used when reading config values
 TRUE_VALUES = set(('true', '1', 'yes', 'on', 't', 'y'))
 
@@ -134,6 +138,11 @@ def validate_configuration():
         sys.exit("Error: [swift-hash]: swift_hash_path_suffix missing "
                  "from /etc/gluster-object/gluster-object.conf")
 
+def strip_obj_storage_path(path, string=_mount_path):
+        """
+        strip /mnt/gluster-object
+        """
+        return path.replace(string, '').strip('/')
 
 def load_libc_function(func_name):
     """
@@ -244,7 +253,6 @@ def rmdirs(path):
             os.rmdir(path)
         except OSError:
             raise
-
 
 def renamer(old, new):
     """
@@ -1061,7 +1069,6 @@ def human_readable(value):
         return '%d' % value
     return '%d%si' % (round(value), suffixes[index])
 
-
 def read_metadata(path):
     """
     Helper function to read the pickled metadata from a File/Directory .
@@ -1082,7 +1089,6 @@ def read_metadata(path):
         return pickle.loads(metadata)
     else:
         return metadata
-
 
 def write_metadata(path, metadata):
     """
@@ -1252,45 +1258,99 @@ def is_marker(metadata):
     else:
         return False
 
+def _update_list(path, const_path, src_list, reg_file=True, object_count=0,
+                 bytes_used=0, obj_list=[]):
+    obj_path = strip_obj_storage_path(path, const_path)
 
-def get_container_details(cont_path):
+    for i in src_list:
+        meta = read_metadata(os.path.join(path, i))
+        if not meta:
+           create_object_metadata(os.path.join(path, i))
+        if obj_path:
+            obj_list.append(os.path.join(obj_path, i))
+        else:
+            obj_list.append(i)
+
+        object_count += 1
+
+        if reg_file:
+            bytes_used += os.path.getsize(path + '/' + i)
+
+    return object_count, bytes_used
+
+def update_list(path, const_path, dirs=[], files=[], object_count=0,
+                bytes_used=0, obj_list=[]):
+    object_count, bytes_used = _update_list (path, const_path, files, True,
+                                             object_count, bytes_used,
+                                             obj_list)
+    object_count, bytes_used = _update_list (path, const_path, dirs, False,
+                                             object_count, bytes_used,
+                                             obj_list)
+    return object_count, bytes_used
+
+def get_container_details_from_fs(cont_path, const_path,
+                                  memcache=None):
+    """
+    get container details by traversing the filesystem
+    """
+    bytes_used = 0
+    object_count = 0
+    obj_list=[]
+    dir_list = []
+
+    if os.path.isdir(cont_path):
+        for (path, dirs, files) in os.walk(cont_path):
+            object_count, bytes_used = update_list(path, const_path, dirs, files,
+                                                   object_count, bytes_used,
+                                                   obj_list)
+
+            dir_list.append(path + ':' + str(os.lstat(path).st_mtime))
+
+    if memcache:
+        memcache.set(strip_obj_storage_path(cont_path), obj_list)
+        memcache.set(strip_obj_storage_path(cont_path) + '-dir_list',
+                     ','.join(dir_list))
+        memcache.set(strip_obj_storage_path(cont_path) + '-cont_meta',
+                     [object_count, bytes_used])
+
+    return obj_list, object_count, bytes_used
+
+def get_container_details_from_memcache(cont_path, const_path,
+                                        memcache):
+    """
+    get container details stored in memcache
+    """
+
+    bytes_used = 0
+    object_count = 0
+    obj_list=[]
+
+    dir_contents = memcache.get(strip_obj_storage_path(cont_path) + '-dir_list')
+    if not dir_contents:
+        return get_container_details_from_fs(cont_path, const_path,
+                                             memcache=memcache)
+
+    for i in dir_contents.split(','):
+        path, mtime = i.split(':')
+        if mtime != str(os.lstat(path).st_mtime):
+            return get_container_details_from_fs(cont_path, const_path,
+                                                 memcache=memcache)
+
+    obj_list = memcache.get(strip_obj_storage_path(cont_path))
+
+    object_count, bytes_used = memcache.get(strip_obj_storage_path(cont_path) + '-cont_meta')
+
+    return obj_list, object_count, bytes_used
+
+def get_container_details(cont_path, memcache=None):
     """
     Return object_list, object_count and bytes_used.
     """
-
-    object_list = []
-    object_count = 0
-    bytes_used = 0
-    if os.path.isdir(cont_path):
-            for (path, dirs, files) in os.walk(cont_path):
-                obj_path = path.replace(cont_path, '', 1)
-                if obj_path:
-                    obj_path = obj_path.strip('/')
-                    obj_path = obj_path + '/'
-                                   
-                for file_name in files:
-                    meta = read_metadata(path + '/' + file_name)
-                    if not meta:
-                       create_object_metadata(path + '/' + file_name)
-                    if obj_path:
-                        object_list.append(obj_path + file_name)
-                    else:
-                        object_list.append(file_name)
-                        
-                    object_count += 1
-                    bytes_used += os.path.getsize(path + '/' + file_name)
-                    
-                for dir_name in dirs:
-                    meta = read_metadata(path + '/' + dir_name)
-                    if not meta:
-                       create_object_metadata(path + '/' + dir_name)
-                    if obj_path:
-                        object_list.append(obj_path + dir_name)
-                    else:
-                        object_list.append(dir_name)
-                        
-                    object_count += 1
-
+    if memcache:
+        object_list, object_count, bytes_used = get_container_details_from_memcache(cont_path, cont_path,
+                                                                                    memcache=memcache)
+    else:
+        object_list, object_count, bytes_used = get_container_details_from_fs(cont_path, cont_path)
 
     return object_list, object_count, bytes_used
 
@@ -1299,20 +1359,19 @@ def get_account_details(acc_path):
     """
     Return container_list and container_count.
     """
-
     container_list = []
     container_count = 0
 
     if os.path.isdir(acc_path):
-            for name in os.listdir(acc_path):
-                if not os.path.isdir(acc_path + '/' + name) or \
-                   name.lower() == 'tmp':
-                    continue
-                meta = read_metadata(acc_path + '/' + name)
-                if not meta:
-                    create_container_metadata(acc_path + '/' + name)
-                container_count += 1
-                container_list.append(name)
+        for name in os.listdir(acc_path):
+            if not os.path.isdir(acc_path + '/' + name) or \
+               name.lower() == 'tmp':
+                continue
+            meta = read_metadata(acc_path + '/' + name)
+            if not meta:
+                create_container_metadata(acc_path + '/' + name)
+            container_count += 1
+            container_list.append(name)
 
     return container_list, container_count
 
@@ -1364,11 +1423,12 @@ def get_object_metadata(obj_path):
 
     return metadata
 
-def get_container_metadata(cont_path):
+def get_container_metadata(cont_path, memcache=None):
     objects = []
     object_count = 0
     bytes_used = 0
-    objects, object_count, bytes_used = get_container_details(cont_path)
+    objects, object_count, bytes_used = get_container_details(cont_path,
+                                                              memcache=memcache)
     metadata = {X_TYPE: CONTAINER,
                 X_TIMESTAMP: normalize_timestamp(os.path.getctime(cont_path)),
                 X_PUT_TIMESTAMP: normalize_timestamp(os.path.getmtime(cont_path)),
@@ -1390,7 +1450,7 @@ def get_account_metadata(acc_path):
 
 def restore_object(obj_path, metadata):
     write_metadata(obj_path, metadata)
-        
+
 def restore_container(cont_path, metadata):
     write_metadata(cont_path, metadata)
 
@@ -1401,8 +1461,8 @@ def create_object_metadata(obj_path):
     meta = get_object_metadata(obj_path)
     restore_object(obj_path, meta)
 
-def create_container_metadata(cont_path):
-    meta = get_container_metadata(cont_path)
+def create_container_metadata(cont_path, memcache=None):
+    meta = get_container_metadata(cont_path, memcache)
     restore_container(cont_path, meta)
 
 def create_account_metadata(acc_path):

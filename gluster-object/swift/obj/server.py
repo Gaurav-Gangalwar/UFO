@@ -103,8 +103,8 @@ class DiskFile(object):
     """
 
     def __init__(self, path, device, partition, account, container, obj,
-                 logger, keep_data_fp=False, disk_chunk_size=65536, uid=DEFAULT_UID,
-                 gid=DEFAULT_GID):
+                 logger, keep_data_fp=False, disk_chunk_size=65536,
+                 uid=DEFAULT_UID, gid=DEFAULT_GID):
         self.disk_chunk_size = disk_chunk_size
         #Don't support obj_name ending/begining with '/', like /a, a/, /a/b/ etc
         obj = obj.strip('/')
@@ -113,15 +113,15 @@ class DiskFile(object):
         else:
             self.obj_path = ''
             self.obj = obj
-        
+
         if self.obj_path:
             self.name = '/'.join((container, self.obj_path))
         else:
             self.name = container
-        
+
         self.datadir = os.path.join(path, device,
                     storage_directory(DATADIR, partition, self.name))
-        
+
         self.device_path = os.path.join(path, device)
         self.container_path = os.path.join(path, device, container)
         self.tmpdir = os.path.join(path, device, 'tmp')
@@ -141,12 +141,13 @@ class DiskFile(object):
         self.gid = int(gid)
         if not os.path.exists(self.datadir + '/' + self.obj):
             return
-                
+
         self.data_file = os.path.join(self.datadir, self.obj)
         self.metadata = read_metadata(self.datadir + '/' + self.obj)
         if not self.metadata:
             create_object_metadata(self.datadir + '/' + self.obj)
             self.metadata = read_metadata(self.datadir + '/' + self.obj)
+
         if not validate_object(self.metadata):
             self.metadata = {}
             self.is_valid = False
@@ -159,8 +160,8 @@ class DiskFile(object):
             self.fp = open(self.data_file, 'rb')
             if not keep_data_fp:
                 self.close(verify_file=False)
-        
-               
+
+
     def __iter__(self):
         """Returns an iterator over the data file."""
         try:
@@ -335,7 +336,7 @@ class DiskFile(object):
                         tmp_path = dir_name
                     if not self.create_dir_object(tmp_path, metadata[X_TIMESTAMP]):
                         return False
-                                       
+
         renamer(tmppath, os.path.join(self.datadir,
                                       self.obj + extension))
         os.chown(os.path.join(self.datadir, self.obj + extension), \
@@ -343,7 +344,7 @@ class DiskFile(object):
         self.metadata = metadata
         self.data_file = self.datadir + '/' + self.obj + extension
         return True
-        
+
 
     def unlinkold(self, timestamp):
         """
@@ -374,7 +375,7 @@ class DiskFile(object):
             else:
                 logging.error('Unable to delete dir %s' % os.path.join(self.datadir, self.obj))
             return
-        
+
         for fname in os.listdir(self.datadir):
             if fname == self.obj:
                 try:
@@ -396,12 +397,12 @@ class DiskFile(object):
                         tmp_path = tmp_path.rsplit('/', 1)[0]
                     else:
                         break
-                    
+
         self.metadata = {}
         self.data_file = None
 
-        
-                    
+
+
     def drop_cache(self, fd, offset, length):
         """Method for no-oping buffer cache drop method."""
         if not self.keep_cache:
@@ -417,7 +418,7 @@ class DiskFile(object):
         """
         #TODO: remove this code.
         print 'Quarantine not used'
-        
+
 
     def get_data_file_size(self):
         """
@@ -441,7 +442,7 @@ class DiskFile(object):
                     if file_size != metadata_size:
                         self.metadata[X_CONTENT_LENGTH] = file_size
                         self.update_object(self.metadata)
-                        
+
                 return file_size
         except OSError, err:
             if err.errno != errno.ENOENT:
@@ -528,7 +529,7 @@ class ObjectController(object):
             self.logger.exception(_('ERROR container update failed with '
                 '%(ip)s:%(port)s/%(dev)s'),
                 {'ip': ip, 'port': port, 'dev': contdevice})
-        
+
 
     def POST(self, request):
         """Handle HTTP POST requests for the Swift Object Server."""
@@ -546,15 +547,13 @@ class ObjectController(object):
             if not check_valid_account(account, self.fs_object):
                 return Response(status='507 %s is not mounted' % device)
         file_obj = DiskFile(self.devices, device, partition, account, container,
-                        obj, self.logger, disk_chunk_size=self.disk_chunk_size)
+                            obj, self.logger, disk_chunk_size=self.disk_chunk_size)
 
         #TODO: Handle marker dir objects.
         if not file_obj.is_valid:
             logging.error('Invalid dir obj name %s %s' % \
                               (file_obj.datadir, file_obj.obj))
             return HTTPNotFound(request=request)
-
-        
 
         if file_obj.is_deleted():
             return HTTPNotFound(request=request)
@@ -567,7 +566,7 @@ class ObjectController(object):
             return HTTPNotFound(request=request)
         metadata = file_obj.metadata
         metadata[X_TIMESTAMP] = request.headers['x-timestamp']
-        
+
         metadata.update((key, value)
             for key, value in request.headers.iteritems()
             if key.lower().startswith('x-object-meta-'))
@@ -575,7 +574,7 @@ class ObjectController(object):
             if header_key in request.headers:
                 header_caps = header_key.title()
                 metadata[header_caps] = request.headers[header_key]
-        
+
         file_obj.put_metadata(metadata)
         return response_class(request=request)
 
@@ -597,7 +596,7 @@ class ObjectController(object):
         error_response = check_object_creation(request, obj)
         if error_response:
             return error_response
-        
+
         file_obj = DiskFile(self.devices, device, partition, account, container,
                             obj, self.logger, disk_chunk_size=self.disk_chunk_size, \
                             uid=request.headers['uid'], gid=request.headers['gid'])
@@ -607,7 +606,7 @@ class ObjectController(object):
             logging.error('Invalid dir obj name %s %s' % \
                           (file_obj.datadir, file_obj.obj))
             return HTTPUnprocessableEntity(request=request)
-            
+
         upload_expiration = time.time() + self.max_upload_time
         etag = md5()
         upload_size = 0
@@ -642,7 +641,7 @@ class ObjectController(object):
             content_type = request.headers['content-type']
             if not content_type:
                 content_type = FILE_TYPE
-                
+
             metadata = {
                 X_TIMESTAMP: request.headers['x-timestamp'],
                 X_CONTENT_TYPE: content_type,
@@ -651,10 +650,10 @@ class ObjectController(object):
                 X_TYPE: OBJECT,
                 X_OBJECT_TYPE: FILE,
             }
-            
+
             if request.headers['content-type'].lower() == DIR_TYPE:
                 metadata.update({X_OBJECT_TYPE: MARKER_DIR})
-                
+
             metadata.update(val for val in request.headers.iteritems()
                     if val[0].lower().startswith('x-object-meta-') and
                     len(val[0]) > 14)
@@ -665,7 +664,7 @@ class ObjectController(object):
             if not file_obj.put(fd, tmppath, metadata):
                 logging.error('Object put failed %s %s %s' % (account, container, obj))
                 return HTTPUnprocessableEntity(request=request)
-        
+
         self.container_update('PUT', account, container, obj, request.headers,
             {'x-content-length': file_obj.metadata[X_CONTENT_LENGTH],
              'x-content-type': file_obj.metadata[X_CONTENT_TYPE],
@@ -696,8 +695,6 @@ class ObjectController(object):
                               (file_obj.datadir, file_obj.obj))
             return HTTPNotFound(request=request)
 
-        
-            
         if file_obj.is_deleted():
             if request.headers.get('if-match') == '*':
                 return HTTPPreconditionFailed(request=request)
@@ -749,7 +746,7 @@ class ObjectController(object):
             response = Response(content_type=file_obj.metadata.get(X_CONTENT_TYPE,
                             DIR_TYPE), request=request,
                             conditional_response=True)
-            
+
         for key, value in file_obj.metadata.iteritems():
             if key.lower().startswith('x-object-meta-') or \
                     key.lower() in self.allowed_headers:
@@ -757,13 +754,13 @@ class ObjectController(object):
         response.etag = file_obj.metadata[X_ETAG]
         response.last_modified = float(file_obj.metadata[X_TIMESTAMP])
         response.content_length = file_size
-        
+
         if not file_obj.is_dir and \
         response.content_length < KEEP_CACHE_SIZE and \
         'X-Auth-Token' not in request.headers and \
         'X-Storage-Token' not in request.headers:
             file_obj.keep_cache = True
-            
+
         if 'Content-Encoding' in file_obj.metadata:
             response.content_encoding = file_obj.metadata['Content-Encoding']
         return request.get_response(response)
@@ -839,7 +836,7 @@ class ObjectController(object):
              X_TIMESTAMP: request.headers['X-Timestamp'],
              X_CONTENT_LENGTH: file_obj.metadata[X_CONTENT_LENGTH],
         }
-        
+
         file_obj.unlink()
         if not file_obj.is_deleted():
             logging.error('Object is not deleted %s %s %s' % (account, container, obj))
@@ -855,7 +852,7 @@ class ObjectController(object):
     def REPLICATE(self, request):
         #TODO: remove this code.
         logging.error("Replicate Not used")
-        
+
 
     def __call__(self, env, start_response):
         """WSGI Application entry point for the Swift Object Server."""
