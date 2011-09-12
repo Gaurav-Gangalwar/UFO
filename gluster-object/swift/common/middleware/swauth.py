@@ -1384,7 +1384,7 @@ class Swauth(object):
                             (path, resp.status))
 
     def create_main_auth_account(self, req, account):
-        #self.create_account_id_mapping(req, account)
+        account_id = get_account_id(account)
         path = quote('/v1/%s/%s' % (self.auth_account_id, account))
         resp = self.make_request(req.environ, 'HEAD',
                                  path).get_response(self.app)
@@ -1392,29 +1392,32 @@ class Swauth(object):
             resp = self.make_request(req.environ, 'PUT',
                                      path, headers={ \
                                               'X-Container-Meta-Account-Id': \
-                                              '%s' % (get_account_id(account)) \
+                                              '%s' % (account_id) \
                                                }).get_response(self.app)
             if resp.status_int // 100 != 2:
                 raise Exception('Could not create account within main auth '
                     'account: %s %s' % (path, resp.status))
                        
         elif resp.status_int // 100 == 2:
-            if 'x-container-meta-account-id' in resp.headers:
+            if 'x-container-meta-account-id' in resp.headers and \
+                resp.headers['x-container-meta-account-id'] == account_id:
                 # Account was already created
-                return
+                return account_id
             else:
-                raise Exception('No account id : %s %s' % (path, resp.status))
+                raise Exception('No account id or account id mismatch: %s %s' % (path, resp.status))
         else:
             raise Exception('Could not verify account within main auth '
                                 'account: %s %s' % (path, resp.status))
+
+        return account_id
             
     def create_services(self, req, account):
-        self.create_main_auth_account(req, account)
+        account_id = self.create_main_auth_account(req, account)
         path = quote('/v1/%s/%s/.services' % (self.auth_account_id, account))
         #print 'Gaurav acc_put path', path
         services = {'storage': {}}
         services['storage'][self.dsc_name] = '%s/%s' % (self.dsc_url,
-            get_account_id(account))
+            account_id)
         services['storage']['default'] = self.dsc_name
         resp = self.make_request(req.environ, 'PUT', path,
                                  json.dumps(services)).get_response(self.app)
