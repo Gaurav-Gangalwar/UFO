@@ -16,7 +16,7 @@
 import logging
 import os
 from ConfigParser import ConfigParser
-from swift.common.utils import get_account_id
+from swift.common.utils import get_account_id, TRUE_VALUES
 from hashlib import md5
 
 class Glusterfs(object):
@@ -27,10 +27,13 @@ class Glusterfs(object):
         self.fs_conf.read(os.path.join('/etc/gluster-object', 'fs.conf'))
         self.mount_path = self.fs_conf.get('DEFAULT', 'mount_path', '/mnt/gluster-object')
         self.auth_account = self.fs_conf.get('DEFAULT', 'auth_account', 'auth')
+        self.mount_ip = self.fs_conf.get('DEFAULT', 'mount_ip', 'localhost')
+        self.remote_cluster = self.fs_conf.get('DEFAULT', 'remote_cluster', False) in TRUE_VALUES
         
-    def mount(self, mount_ip, account, mount_path):
+    def mount(self, account):
         export = self.get_export_from_account_id(account)
-        mnt_cmd = 'mount -t glusterfs %s:%s %s' % (mount_ip, export, \
+        mount_path = os.path.join(self.mount_path, account)
+        mnt_cmd = 'mount -t glusterfs %s:%s %s' % (self.mount_ip, export, \
                                                            mount_path)
         if os.system(mnt_cmd) or \
         not os.path.exists(os.path.join(mount_path)):
@@ -44,7 +47,7 @@ class Glusterfs(object):
         if os.system(umnt_cmd):
             logging.error('Unable to unmount %s %s' % (mount_path, self.name))
 
-    def get_export_list(self):
+    def get_export_list_local(self):
         export_list = []
         cmnd = 'gluster volume info'
 
@@ -62,6 +65,34 @@ class Glusterfs(object):
                 export_list.append(item.split(':')[1].strip(' '))
             
         return export_list
+
+
+    def get_export_list_remote(self):
+        export_list = []
+        cmnd = 'ssh %s gluster volume info' % self.mount_ip
+        print 'Remote'
+
+        if os.system(cmnd + ' >> /dev/null'):
+            raise Exception('Getting volume info failed %s, make sure to have \
+                            passwordless ssh on %s', self.name, self.mount_ip)
+            return export_list
+
+        fp = os.popen(cmnd)
+        while True:
+            item = fp.readline()
+            if not item:
+                break
+            item = item.strip('\n').strip(' ')
+            if item.lower().startswith('volume name:'):
+                export_list.append(item.split(':')[1].strip(' '))
+            
+        return export_list
+
+    def get_export_list(self):
+        if self.remote_cluster:
+            return self.get_export_list_remote()
+        else:
+            return self.get_export_list_local()
 
     def get_export_from_account_id(self, account):
         for export in self.get_export_list():

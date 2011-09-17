@@ -1165,7 +1165,7 @@ def _check_valid_account(account, fs_object):
         fs_object.unmount(os.path.join(mount_path, account))
                     
     if fs_object:
-        if not fs_object.mount(MOUNT_IP, account, os.path.join(mount_path, account)):
+        if not fs_object.mount(account):
             return False
 
     if not check_user_xattr(os.path.join(mount_path, account)):
