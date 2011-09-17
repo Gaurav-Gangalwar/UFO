@@ -578,7 +578,7 @@ class Controller(object):
     def get_object_nodes(self, account):
         nodes = []
         node = {
-            'ip': OBJECT_SERVER_IP,
+            'ip': self.app.object_ip,
             'port': self.app.object_port,
             'device': account
             }
@@ -588,7 +588,7 @@ class Controller(object):
     def get_container_nodes(self, account):
         nodes = []
         node = {
-            'ip': CONTAINER_SERVER_IP,
+            'ip': self.app.container_ip,
             'port': self.app.container_port,
             'device': account
             }
@@ -598,7 +598,7 @@ class Controller(object):
     def get_account_nodes(self, account):
         nodes = []
         node = {
-            'ip': ACCOUNT_SERVER_IP,
+            'ip': self.app.account_ip,
             'port': self.app.account_port,
             'device': account
             }
@@ -1453,8 +1453,11 @@ class BaseApplication(object):
 
         gluster_object_dir = conf.get('gluster_object_dir', '/etc/gluster-object')
         self.object_port = int(conf.get('object_port', 6010))
+        self.object_ip = conf.get('object_ip', '127.0.0.1')
         self.container_port = int(conf.get('container_port', 6011))
+        self.container_ip = conf.get('container_ip', '127.0.0.1')
         self.account_port = int(conf.get('account_port', 6012))
+        self.account_ip = conf.get('account_ip', '127.0.0.1')
         self.node_timeout = int(conf.get('node_timeout', 10))
         self.conn_timeout = float(conf.get('conn_timeout', 0.5))
         self.client_timeout = int(conf.get('client_timeout', 60))
