@@ -41,7 +41,7 @@ from swift.common.utils import mkdirs, normalize_timestamp, \
     storage_directory, hash_path, renamer, fallocate, \
     split_path, drop_buffer_cache, get_logger, write_pickle, \
     read_metadata, write_metadata, mkdirs, rmdirs, validate_object, \
-    check_valid_account, create_object_metadata
+    check_valid_account, create_object_metadata, remove_dir_path
 from swift.common.bufferedhttp import http_connect
 from swift.common.constraints import check_object_creation, check_mount, \
     check_float, check_utf8
@@ -92,8 +92,8 @@ class DiskFile(object):
     """
     Manage object files on disk.
 
-    :param path: path to devices on the node
-    :param device: device name
+    :param path: path to devices on the node/mount path for UFO.
+    :param device: device name/account_name for UFO.
     :param partition: partition on the device the object lives in
     :param account: account name for the object
     :param container: container name for the object
@@ -118,7 +118,7 @@ class DiskFile(object):
             self.name = '/'.join((container, self.obj_path))
         else:
             self.name = container
-
+        #Absolute path for obj directory.
         self.datadir = os.path.join(path, device,
                     storage_directory(DATADIR, partition, self.name))
 
@@ -274,8 +274,7 @@ class DiskFile(object):
             except OSError:
                 pass
 
-    def create_dir_object(self, dir_name, timestamp):
-        dir_path = os.path.join(self.container_path, dir_name)
+    def create_dir_object(self, dir_path):
         #TODO: if object already exists???
         if os.path.exists(dir_path) and not os.path.isdir(dir_path):
             os.unlink(dir_path)
@@ -306,11 +305,7 @@ class DiskFile(object):
         """
         #Marker dir.
         if metadata[X_OBJECT_TYPE] == MARKER_DIR:
-            if os.path.exists(os.path.join(self.datadir, self.obj)) and \
-               not os.path.isdir(os.path.join(self.datadir, self.obj)):
-                os.unlink(os.path.join(self.datadir, self.obj))
-            mkdirs(os.path.join(self.datadir, self.obj))
-            os.chown(os.path.join(self.datadir, self.obj), self.uid, self.gid)
+            self.create_dir_object(os.path.join(self.datadir, self.obj))
             self.put_metadata(metadata)
             self.data_file = self.datadir + '/' + self.obj
             return True
@@ -334,7 +329,8 @@ class DiskFile(object):
                         tmp_path = tmp_path + '/' + dir_name
                     else:
                         tmp_path = dir_name
-                    if not self.create_dir_object(tmp_path, metadata[X_TIMESTAMP]):
+                    if not self.create_dir_object(os.path.join(self.container_path,
+                            tmp_path)):
                         return False
 
         renamer(tmppath, os.path.join(self.datadir,
@@ -384,19 +380,8 @@ class DiskFile(object):
                     if err.errno != errno.ENOENT:
                         raise
 
-        if self.obj_path:
-            obj_dirs = self.obj_path.split('/')
-            tmp_path = self.obj_path
-            if len(obj_dirs):
-                while tmp_path:
-                    #TODO: Check dir is empty (Done in rmdirs)
-                    dir_path = os.path.join(self.container_path, tmp_path)
-                    metadata = read_metadata(dir_path)
-                    rmdirs(dir_path)
-                    if '/' in tmp_path:
-                        tmp_path = tmp_path.rsplit('/', 1)[0]
-                    else:
-                        break
+        #Remove entire path for object.
+        remove_dir_path(self.obj_path, self.container_path)
 
         self.metadata = {}
         self.data_file = None

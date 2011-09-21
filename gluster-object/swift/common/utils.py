@@ -254,6 +254,21 @@ def rmdirs(path):
         except OSError:
             raise
 
+def remove_dir_path(path, container_path):
+    if path:
+        obj_dirs = path.split('/')
+        tmp_path = path
+        if len(obj_dirs):
+            while tmp_path:
+                #TODO: Check dir is empty (Done in rmdirs)
+                dir_path = os.path.join(container_path, tmp_path)
+                rmdirs(dir_path)
+                if '/' in tmp_path:
+                    tmp_path = tmp_path.rsplit('/', 1)[0]
+                else:
+                    break
+    
+
 def renamer(old, new):
     """
     Attempt to fix / hide race conditions like empty object directories
