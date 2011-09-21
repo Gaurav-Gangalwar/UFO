@@ -94,7 +94,7 @@ class DiskDir(object):
             ret = validate_container(self.metadata)
         else:
             if not self.metadata:
-                create_account_metadata(self.datadir)
+                create_account_metadata(self.datadir, memcache=self.memcache)
                 self.metadata = read_metadata(self.datadir)
             ret = validate_account(self.metadata)
 
@@ -330,7 +330,7 @@ class DiskDir(object):
         container_count = 0
         account_list = []
 
-        containers, container_count = get_account_details(self.datadir)
+        containers, container_count = get_account_details(self.datadir, self.memcache)
 
         if int(self.metadata[X_CONTAINER_COUNT]) != container_count:
             self.metadata[X_CONTAINER_COUNT] = container_count
@@ -399,7 +399,7 @@ class DiskDir(object):
         containers = []
         container_count = 0
 
-        containers, container_count = get_account_details(self.datadir)
+        containers, container_count = get_account_details(self.datadir, self.memcache)
 
         if int(self.metadata[X_CONTAINER_COUNT]) != container_count:
             self.metadata[X_CONTAINER_COUNT] = container_count

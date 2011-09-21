@@ -1476,10 +1476,10 @@ def get_container_metadata(cont_path, memcache=None):
                 X_BYTES_USED: bytes_used}
     return metadata
 
-def get_account_metadata(acc_path):
+def get_account_metadata(acc_path, memcache=None):
     containers = []
     container_count = 0
-    containers, container_count = get_account_details(acc_path)
+    containers, container_count = get_account_details(acc_path, memcache)
     metadata = {X_TYPE: ACCOUNT,
                 X_TIMESTAMP: normalize_timestamp(os.path.getctime(acc_path)),
                 X_PUT_TIMESTAMP: normalize_timestamp(os.path.getmtime(acc_path)),
@@ -1505,8 +1505,8 @@ def create_container_metadata(cont_path, memcache=None):
     meta = get_container_metadata(cont_path, memcache)
     restore_container(cont_path, meta)
 
-def create_account_metadata(acc_path):
-    meta = get_account_metadata(acc_path)
+def create_account_metadata(acc_path, memcache=None):
+    meta = get_account_metadata(acc_path, memcache)
     restore_account(acc_path, meta)
 
 
