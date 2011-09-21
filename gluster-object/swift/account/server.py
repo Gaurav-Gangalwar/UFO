@@ -226,30 +226,33 @@ class AccountController(object):
         #print 'S3 con_type', req, out_content_type
         account_list = dir_obj.list_account_containers(limit, marker, end_marker,
                                                    prefix, delimiter)
+        
         if out_content_type == 'application/json':
             json_pattern = ['"name":%s', '"count":%s', '"bytes":%s']
             json_pattern = '{' + ','.join(json_pattern) + '}'
             json_out = []
-            for (name, object_count, bytes_used, is_subdir) in account_list:
-                name = simplejson.dumps(name)
-                if is_subdir:
-                    json_out.append('{"subdir":%s}' % name)
-                else:
-                    json_out.append(json_pattern %
-                        (name, object_count, bytes_used))
+            if account_list:
+                for (name, object_count, bytes_used, is_subdir) in account_list:
+                    name = simplejson.dumps(name)
+                    if is_subdir:
+                        json_out.append('{"subdir":%s}' % name)
+                    else:
+                        json_out.append(json_pattern %
+                            (name, object_count, bytes_used))
             account_list = '[' + ','.join(json_out) + ']'
         elif out_content_type.endswith('/xml'):
             output_list = ['<?xml version="1.1" encoding="UTF-8"?>',
-                           '<account name="%s">' % account]
-            for (name, object_count, bytes_used, is_subdir) in account_list:
-                name = saxutils.escape(name, XML_EXTRA_ENTITIES)
-                if is_subdir:
-                    output_list.append('<subdir name="%s" />' % name)
-                else:
-                    item = '<container><name>%s</name><count>%s</count>' \
-                           '<bytes>%s</bytes></container>' % \
-                           (name, object_count, bytes_used)
-                    output_list.append(item)
+                            '<account name="%s">' % account]
+            if account_list:
+                for (name, object_count, bytes_used, is_subdir) in account_list:
+                    name = saxutils.escape(name, XML_EXTRA_ENTITIES)
+                    if is_subdir:
+                        output_list.append('<subdir name="%s" />' % name)
+                    else:
+                        item = '<container><name>%s</name><count>%s</count>' \
+                                '<bytes>%s</bytes></container>' % \
+                                (name, object_count, bytes_used)
+                        output_list.append(item)
             output_list.append('</account>')
             account_list = '\n'.join(output_list)
         else:

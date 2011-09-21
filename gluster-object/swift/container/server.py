@@ -661,48 +661,50 @@ class ContainerController(object):
                                 default_match='text/plain')
         container_list = dir_obj.list_container_objects(limit, marker, end_marker,
                                                   prefix, delimiter, path)
-
+        
         if out_content_type == 'application/json':
             json_pattern = ['"name":%s', '"hash":"%s"', '"bytes":%s',
                             '"content_type":%s, "last_modified":"%s"']
             json_pattern = '{' + ','.join(json_pattern) + '}'
             json_out = []
-            for (name, created_at, size, content_type, etag) in container_list:
-                # escape name and format date here
-                name = simplejson.dumps(name)
-                created_at = datetime.utcfromtimestamp(
-                    float(created_at)).isoformat()
-                if content_type is None:
-                    json_out.append('{"subdir":%s}' % name)
-                else:
-                    content_type = simplejson.dumps(content_type)
-                    json_out.append(json_pattern % (name,
-                                                    etag,
-                                                    size,
-                                                    content_type,
-                                                    created_at))
+            if container_list:
+                for (name, created_at, size, content_type, etag) in container_list:
+                    # escape name and format date here
+                    name = simplejson.dumps(name)
+                    created_at = datetime.utcfromtimestamp(
+                        float(created_at)).isoformat()
+                    if content_type is None:
+                        json_out.append('{"subdir":%s}' % name)
+                    else:
+                        content_type = simplejson.dumps(content_type)
+                        json_out.append(json_pattern % (name,
+                                                        etag,
+                                                        size,
+                                                        content_type,
+                                                        created_at))
             container_list = '[' + ','.join(json_out) + ']'
         elif out_content_type.endswith('/xml'):
             xml_output = []
-            for (name, created_at, size, content_type, etag) in container_list:
-                # escape name and format date here
-                name = saxutils.escape(name, XML_EXTRA_ENTITIES)
-                created_at = datetime.utcfromtimestamp(
-                    float(created_at)).isoformat()
-                if content_type is None:
-                    xml_output.append('<subdir name="%s"><name>%s</name>'
-                                      '</subdir>' % (name, name))
-                else:
-                    content_type = saxutils.escape(content_type,
-                                                   XML_EXTRA_ENTITIES)
-                    xml_output.append('<object><name>%s</name><hash>%s</hash>'\
-                           '<bytes>%d</bytes><content_type>%s</content_type>'\
-                           '<last_modified>%s</last_modified></object>' % \
-                           (name, etag, int(size), content_type, created_at))
+            if container_list:
+                for (name, created_at, size, content_type, etag) in container_list:
+                    # escape name and format date here
+                    name = saxutils.escape(name, XML_EXTRA_ENTITIES)
+                    created_at = datetime.utcfromtimestamp(
+                        float(created_at)).isoformat()
+                    if content_type is None:
+                        xml_output.append('<subdir name="%s"><name>%s</name>'
+                                            '</subdir>' % (name, name))
+                    else:
+                        content_type = saxutils.escape(content_type,
+                                                        XML_EXTRA_ENTITIES)
+                        xml_output.append('<object><name>%s</name><hash>%s</hash>'\
+                                '<bytes>%d</bytes><content_type>%s</content_type>'\
+                                '<last_modified>%s</last_modified></object>' % \
+                                (name, etag, int(size), content_type, created_at))
             container_list = ''.join([
                 '<?xml version="1.1" encoding="UTF-8"?>\n',
                 '<container name=%s>' % 
-                    saxutils.quoteattr(container, XML_EXTRA_ENTITIES),
+                saxutils.quoteattr(container, XML_EXTRA_ENTITIES),
                 ''.join(xml_output), '</container>'])
         else:
             if container_list:

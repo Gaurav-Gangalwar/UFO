@@ -1369,11 +1369,7 @@ def get_container_details(cont_path, memcache=None):
 
     return object_list, object_count, bytes_used
 
-
-def get_account_details(acc_path):
-    """
-    Return container_list and container_count.
-    """
+def get_account_details_from_fs(acc_path, memcache=None):
     container_list = []
     container_count = 0
 
@@ -1388,8 +1384,37 @@ def get_account_details(acc_path):
             container_count += 1
             container_list.append(name)
 
+    if memcache:
+        memcache.set(strip_obj_storage_path(acc_path) + '_container_list', container_list)
+        memcache.set(strip_obj_storage_path(acc_path)+'_mtime', str(os.lstat(acc_path).st_mtime))
+        memcache.set(strip_obj_storage_path(acc_path)+'_container_count', container_count)
+
     return container_list, container_count
 
+def get_account_details_from_memcache(acc_path, memcache=None):
+    if memcache:
+        mtime = memcache.get(strip_obj_storage_path(acc_path)+'_mtime')
+        if not mtime or mtime != str(os.lstat(acc_path).st_mtime):
+            return get_account_details_from_fs(acc_path, memcache)
+        container_list = memcache.get(strip_obj_storage_path(acc_path) + '_container_list')
+        container_count = memcache.get(strip_obj_storage_path(acc_path)+'_container_count')
+        return container_list, container_count
+        
+        
+
+    
+
+
+def get_account_details(acc_path, memcache=None):
+    """
+    Return container_list and container_count.
+    """
+    if memcache:
+        return get_account_details_from_memcache(acc_path, memcache)
+    else:
+        return get_account_details_from_fs(acc_path, memcache)
+        
+    
 
 def get_etag(path):
     etag = None
