@@ -600,7 +600,8 @@ class ContainerController(object):
         if not dir_obj.dir_exists:
             return HTTPNotFound(request=req)
 
-        dir_obj.update_object_count()
+        if 'no_count_update' not in req.headers:
+            dir_obj.update_object_count()
 
         headers = {
             'X-Container-Object-Count': dir_obj.metadata[X_OBJECTS_COUNT],

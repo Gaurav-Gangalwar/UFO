@@ -168,8 +168,9 @@ class AccountController(object):
         dir_obj = DiskDir(self.root, drive, part, account, '', self.logger)
         if not dir_obj.dir_exists:
             return HTTPNotFound(request=req)
-        
-        dir_obj.update_container_count()
+
+        if 'no_count_update' not in req.headers:
+            dir_obj.update_container_count()
         
         headers = {
             'X-Account-Container-Count': dir_obj.metadata[X_CONTAINER_COUNT],

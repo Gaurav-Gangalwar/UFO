@@ -363,7 +363,7 @@ class Controller(object):
         result_code = 0
         attempts_left = REPLICA_COUNT
         path = '/%s' % account
-        headers = {'x-trans-id': self.trans_id}
+        headers = {'x-trans-id': self.trans_id, 'no_count_update': True }
         for node in nodes:
             try:
                 with ConnectionTimeout(self.app.conn_timeout):
@@ -437,7 +437,7 @@ class Controller(object):
         write_acl = None
         container_size = None
         attempts_left = REPLICA_COUNT
-        headers = {'x-trans-id': self.trans_id}
+        headers = {'x-trans-id': self.trans_id, 'no_count_update': True}
         for node in nodes:
             try:
                 with ConnectionTimeout(self.app.conn_timeout):
