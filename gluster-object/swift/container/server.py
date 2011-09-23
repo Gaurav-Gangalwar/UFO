@@ -257,7 +257,7 @@ class DiskDir(object):
         return filtered_objs
 
     def list_container_objects(self, limit, marker, end_marker,
-                               prefix, delimiter, path):
+                               prefix, delimiter, path, out_content_type):
         """
         Returns tuple of name, created_at, size, content_type, etag.
         """
@@ -307,10 +307,12 @@ class DiskDir(object):
         if objects:
             for obj in objects:
                 list_item = []
+                metadata = None
                 list_item.append(obj)
-                metadata = read_metadata(self.datadir + '/' + obj)
-                if not metadata:
-                    metadata = create_object_metadata(self.datadir + '/' + obj)
+                if out_content_type != 'text/plain':
+                    metadata = read_metadata(self.datadir + '/' + obj)
+                    if not metadata:
+                        metadata = create_object_metadata(self.datadir + '/' + obj)
                 #print 'Gaurav list_obj meta', metadata
                 if metadata:
                     list_item.append(metadata[X_TIMESTAMP])
@@ -323,7 +325,8 @@ class DiskDir(object):
         return container_list
 
     def list_account_containers(self, limit, marker, end_marker,
-                                                   prefix, delimiter):
+                                                   prefix, delimiter,
+                                                   out_content_type):
         """
         Return tuple of name, object_count, bytes_used, 0(is_subdir).
         Used by account server.
@@ -362,10 +365,12 @@ class DiskDir(object):
         if containers:
             for cont in containers:
                 list_item = []
+                metadata = None
                 list_item.append(cont)
-                metadata = read_metadata(self.datadir + '/' + cont)
-                if not metadata:
-                    metadata = create_container_metadata(self.datadir + '/' + cont)
+                if out_content_type != 'text/plain':
+                    metadata = read_metadata(self.datadir + '/' + cont)
+                    if not metadata:
+                        metadata = create_container_metadata(self.datadir + '/' + cont)
 
                 if metadata:
                     list_item.append(metadata[X_OBJECTS_COUNT])
@@ -666,7 +671,8 @@ class ContainerController(object):
                                  'application/xml', 'text/xml'],
                                 default_match='text/plain')
         container_list = dir_obj.list_container_objects(limit, marker, end_marker,
-                                                  prefix, delimiter, path)
+                                                  prefix, delimiter, path,
+                                                  out_content_type)
         
         if out_content_type == 'application/json':
             json_pattern = ['"name":%s', '"hash":"%s"', '"bytes":%s',

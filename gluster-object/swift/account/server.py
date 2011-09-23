@@ -226,7 +226,8 @@ class AccountController(object):
                                 default_match='text/plain')
         #print 'S3 con_type', req, out_content_type
         account_list = dir_obj.list_account_containers(limit, marker, end_marker,
-                                                   prefix, delimiter)
+                                                   prefix, delimiter,
+                                                   out_content_type)
         
         if out_content_type == 'application/json':
             json_pattern = ['"name":%s', '"count":%s', '"bytes":%s']
