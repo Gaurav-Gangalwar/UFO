@@ -149,6 +149,8 @@ class DiskFile(object):
             self.metadata = read_metadata(self.datadir + '/' + self.obj)
 
         if not validate_object(self.metadata):
+            self.logger.error('Metadata validation failed %s %s' % \
+                            (self.data_file, self.metadata))
             self.metadata = {}
             self.is_valid = False
             self.data_file = None

@@ -1278,9 +1278,6 @@ def _update_list(path, const_path, src_list, reg_file=True, object_count=0,
     obj_path = strip_obj_storage_path(path, const_path)
 
     for i in src_list:
-        meta = read_metadata(os.path.join(path, i))
-        if not meta:
-           create_object_metadata(os.path.join(path, i))
         if obj_path:
             obj_list.append(os.path.join(obj_path, i))
         else:
@@ -1378,9 +1375,6 @@ def get_account_details_from_fs(acc_path, memcache=None):
             if not os.path.isdir(acc_path + '/' + name) or \
                name.lower() == 'tmp':
                 continue
-            meta = read_metadata(acc_path + '/' + name)
-            if not meta:
-                create_container_metadata(acc_path + '/' + name)
             container_count += 1
             container_list.append(name)
 
@@ -1500,14 +1494,17 @@ def restore_account(acc_path, metadata):
 def create_object_metadata(obj_path):
     meta = get_object_metadata(obj_path)
     restore_object(obj_path, meta)
+    return meta
 
 def create_container_metadata(cont_path, memcache=None):
     meta = get_container_metadata(cont_path, memcache)
     restore_container(cont_path, meta)
+    return meta
 
 def create_account_metadata(acc_path, memcache=None):
     meta = get_account_metadata(acc_path, memcache)
     restore_account(acc_path, meta)
+    return meta
 
 
 def check_account_exists(account, fs_object):

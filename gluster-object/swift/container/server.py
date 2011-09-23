@@ -37,7 +37,7 @@ from swift.common.utils import get_logger, get_param, hash_path, \
     write_metadata, clean_metadata, dir_empty, mkdirs, rmdirs, validate_account, \
     validate_container, validate_object, check_valid_account, is_marker, \
     get_container_details, get_account_details, create_container_metadata, \
-    create_account_metadata, cache_from_env
+    create_account_metadata, create_object_metadata, cache_from_env
 from swift.common.constraints import CONTAINER_LISTING_LIMIT, \
     check_mount, check_float, check_utf8
 from swift.common.bufferedhttp import http_connect
@@ -99,6 +99,8 @@ class DiskDir(object):
             ret = validate_account(self.metadata)
 
         if not ret:
+            self.logger.error('Metadata validation failed %s %s' % \
+                              (self.datadir, self.metadata))
             self.dir_exists = False
             self.metadata = {}
 
@@ -307,6 +309,8 @@ class DiskDir(object):
                 list_item = []
                 list_item.append(obj)
                 metadata = read_metadata(self.datadir + '/' + obj)
+                if not metadata:
+                    metadata = create_object_metadata(self.datadir + '/' + obj)
                 #print 'Gaurav list_obj meta', metadata
                 if metadata:
                     list_item.append(metadata[X_TIMESTAMP])
@@ -360,6 +364,8 @@ class DiskDir(object):
                 list_item = []
                 list_item.append(cont)
                 metadata = read_metadata(self.datadir + '/' + cont)
+                if not metadata:
+                    metadata = create_container_metadata(self.datadir + '/' + cont)
 
                 if metadata:
                     list_item.append(metadata[X_OBJECTS_COUNT])
