@@ -237,7 +237,7 @@ def mkdirs(path):
     """
     if not os.path.isdir(path):
         try:
-            os.makedirs(path)
+            do_makedirs(path)
         except OSError, err:
             #TODO: check, isdir will fail if mounted and volume stopped.
             #if err.errno != errno.EEXIST or not os.path.isdir(path)
@@ -249,10 +249,11 @@ def dir_empty(path):
     
 def rmdirs(path):
     if os.path.isdir(path) and dir_empty(path):
-        try:
-            os.rmdir(path)
-        except OSError:
-            raise
+        do_rmdir(path)
+    else:
+        logging.error("rmdirs failed dir may not be empty or not valid dir")
+        return False
+        
 
 def remove_dir_path(path, container_path):
     if path:
@@ -277,21 +278,15 @@ def renamer(old, new):
     :param old: old path to be renamed
     :param new: new path to be renamed to
     """
-    #print 'Gaurav rename old new', old, new
-    #if not os.path.exists(new):
-        #print 'Gaurav rname path ok'
-    
+        
     try:
         mkdirs(os.path.dirname(new))
-        os.rename(old, new)
+        do_rename(old, new)
     except OSError:
         mkdirs(os.path.dirname(new))
-        os.rename(old, new)
+        do_rename(old, new)
         
-    #if os.path.exists(new) :
-        #print 'Gaurav rename path', new, os.path.getsize(new), os.path.getctime(new)
-
-
+    
 def split_path(path, minsegs=1, maxsegs=None, rest_with_last=False):
     """
     Validate and split the given HTTP request path.
@@ -1084,6 +1079,149 @@ def human_readable(value):
         return '%d' % value
     return '%d%si' % (round(value), suffixes[index])
 
+def do_mkdir(path):
+    try:
+        os.mkdir(path)
+    except Exception, err:
+        logging.exception("Mkdir failed on %s err: %s", path, str(err))
+        if err.errno != errno.EEXIST:
+            raise
+    return True
+
+def do_makedirs(path):
+    try:
+        os.makedirs(path)
+    except Exception, err:
+        logging.exception("Makedirs failed on %s err: %s", path, str(err))
+        if err.errno != errno.EEXIST:
+            raise
+    return True
+def do_chown(path, uid, gid):
+    try:
+        os.chown(path, uid, gid)
+    except Exception, err:
+        logging.exception("Chown failed on %s err: %s", path, str(err))
+        raise
+    return True
+
+def do_stat(path):
+    try:
+        buf = os.stat(path)
+    except Exception, err:
+        logging.exception("Stat failed on %s err: %s", path, str(err))
+        raise
+
+    return buf
+
+def do_open(path, mode):
+    try:
+        fd = open(path, mode)
+    except Exception, err:
+        logging.exception("Open failed on %s err: %s", path, str(err))
+        raise
+    return fd
+
+def do_close(fd):
+    #fd could be file or int type.
+    try:
+        if isinstance(fd, int):
+            os.close(fd)
+        else:
+            fd.close()
+    except Exception, err:
+        logging.exception("Close failed on %s err: %s", fd, str(err))
+        raise
+    return True
+
+def do_unlink(path):
+    try:
+        os.unlink(path)
+    except Exception, err:
+        logging.exception("Unlink failed on %s err: %s", path, str(err))
+        if err.errno != errno.ENOENT:
+            raise
+    return True
+
+def do_rmdir(path):
+    try:
+        os.rmdir(path)
+    except Exception, err:
+        logging.exception("Rmdir failed on %s err: %s", path, str(err))
+        if err.errno != errno.ENOENT:
+            raise
+    return True
+
+def do_rename(old_path, new_path):
+    try:
+        os.rename(old_path, new_path)
+    except Exception, err:
+        logging.exception("Rename failed on %s to %s  err: %s", old_path, new_path, \
+                          str(err))
+        raise
+    return True
+        
+def do_setxattr(path, key, value):
+    fd = None
+    if not os.path.isdir(path):
+        fd = do_open(path, 'rb')
+    else:
+        fd = path
+    if fd or os.path.isdir(path):
+        try:
+            setxattr(fd, key, value)
+        except Exception, err:
+            logging.exception("setxattr failed on %s key %s err: %s", path, key, str(err))
+            raise
+        finally:
+            if fd and not os.path.isdir(path):
+                do_close(fd)
+    else:
+        logging.error("Open failed path %s", path)
+        return False
+    return True
+    
+        
+
+def do_getxattr(path, key):
+    fd = None
+    if not os.path.isdir(path):
+        fd = do_open(path, 'rb')
+    else:
+        fd = path
+    if fd or os.path.isdir(path):
+        try:
+            value = getxattr(fd, key)
+        except Exception, err:
+            logging.exception("getxattr failed on %s key %s err: %s", path, key, str(err))
+            raise
+        finally:
+            if fd and not os.path.isdir(path):
+                do_close(fd)
+    else:
+        logging.error("Open failed path %s", path)
+        return False
+    return value
+
+def do_removexattr(path, key):
+    fd = None
+    if not os.path.isdir(path):
+        fd = do_open(path, 'rb')
+    else:
+        fd = path
+    if fd or os.path.isdir(path):
+        try:
+            removexattr(fd, key)
+        except Exception, err:
+            logging.exception("removexattr failed on %s key %s err: %s", path, key, str(err))
+            raise
+        finally:
+            if fd and not os.path.isdir(path):
+                do_close(fd)
+    else:
+        logging.error("Open failed path %s", path)
+        return False
+    return True
+
 def read_metadata(path):
     """
     Helper function to read the pickled metadata from a File/Directory .
@@ -1094,16 +1232,17 @@ def read_metadata(path):
     """
     metadata = ''
     key = 0
-    try:
-        while True:
-            metadata += getxattr(path, '%s%s' % (METADATA_KEY, (key or '')))
-            key += 1
-    except IOError:
-        pass
+    while True:
+        try:
+            metadata += do_getxattr(path, '%s%s' % (METADATA_KEY, (key or '')))
+        except Exception:
+            break
+        key += 1
     if metadata:
         return pickle.loads(metadata)
     else:
         return metadata
+
 
 def write_metadata(path, metadata):
     """
@@ -1115,18 +1254,15 @@ def write_metadata(path, metadata):
     metastr = pickle.dumps(metadata, PICKLE_PROTOCOL)
     key = 0
     while metastr:
-        setxattr(path, '%s%s' % (METADATA_KEY, key or ''), metastr[:254])
+        do_setxattr(path, '%s%s' % (METADATA_KEY, key or ''), metastr[:254])
         metastr = metastr[254:]
         key += 1
 
 def clean_metadata(path):
     key = 0
     while True:
-        try:
-            value = getxattr(path, '%s%s' % (METADATA_KEY, (key or '')))
-        except IOError:
-            break;
-        removexattr(path, '%s%s' % (METADATA_KEY, (key or '')))
+        value = do_getxattr(path, '%s%s' % (METADATA_KEY, (key or '')))
+        do_removexattr(path, '%s%s' % (METADATA_KEY, (key or '')))
         key += 1
 
 
@@ -1137,7 +1273,11 @@ def dir_empty(path):
     :returns: True/False.
     """
     if os.path.isdir(path):
-        files = os.listdir(path)
+        try:
+            files = os.listdir(path)
+        except Exception, err:
+            logging.exception("listdir failed on %s err: %s", path, str(err))
+            raise
         if not files:
             return True
         else:
@@ -1152,16 +1292,12 @@ def get_device_from_account(account):
 def check_user_xattr(path):
     if not os.path.exists(path):
         return False
-    try:
-        setxattr(path, 'user.key1', 'value1')
-    except:
-        raise
-        return False
+    do_setxattr(path, 'user.test.key1', 'value1')
     try:
         removexattr(path, 'user.key1')
-    except:
-        raise
-        return False
+    except Exception, err:
+        logging.exception("removexattr failed on %s err: %s", path, str(err))
+        #Remove xattr may fail in case of concurrent remove.
     return True
 
    

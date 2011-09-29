@@ -41,7 +41,8 @@ from swift.common.utils import mkdirs, normalize_timestamp, \
     storage_directory, hash_path, renamer, fallocate, \
     split_path, drop_buffer_cache, get_logger, write_pickle, \
     read_metadata, write_metadata, mkdirs, rmdirs, validate_object, \
-    check_valid_account, create_object_metadata, remove_dir_path
+    check_valid_account, create_object_metadata, remove_dir_path, do_open, \
+    do_close, do_unlink, do_chown
 from swift.common.bufferedhttp import http_connect
 from swift.common.constraints import check_object_creation, check_mount, \
     check_float, check_utf8
@@ -159,7 +160,7 @@ class DiskFile(object):
         if os.path.isdir(self.datadir + '/' + self.obj):
             self.is_dir = True
         else:
-            self.fp = open(self.data_file, 'rb')
+            self.fp = do_open(self.data_file, 'rb')
             if not keep_data_fp:
                 self.close(verify_file=False)
 
@@ -246,7 +247,7 @@ class DiskFile(object):
                      {'exc': e, 'stack': ''.join(traceback.format_stack()),
                       'data_file': self.data_file, 'data_dir': self.datadir})
             finally:
-                self.fp.close()
+                do_close(self.fp)
                 self.fp = None
 
     def is_deleted(self):
@@ -268,21 +269,22 @@ class DiskFile(object):
             yield fd, tmppath
         finally:
             try:
-                os.close(fd)
+                do_close(fd)
             except OSError:
                 pass
             try:
-                os.unlink(tmppath)
+                do_unlink(tmppath)
             except OSError:
                 pass
 
     def create_dir_object(self, dir_path):
         #TODO: if object already exists???
         if os.path.exists(dir_path) and not os.path.isdir(dir_path):
-            os.unlink(dir_path)
+            self.logger.error("Deleting file %s", dir_path)
+            do_unlink(dir_path)
         #If dir aleady exist just override metadata.
         mkdirs(dir_path)
-        os.chown(dir_path, self.uid, self.gid)
+        do_chown(dir_path, self.uid, self.gid)
         create_object_metadata(dir_path)
         return True
 
@@ -318,7 +320,7 @@ class DiskFile(object):
             return False
         #metadata['name'] = self.name
         timestamp = normalize_timestamp(metadata[X_TIMESTAMP])
-        write_metadata(fd, metadata)
+        write_metadata(tmppath, metadata)
         if X_CONTENT_LENGTH in metadata:
             self.drop_cache(fd, 0, int(metadata[X_CONTENT_LENGTH]))
         tpool.execute(os.fsync, fd)
@@ -337,7 +339,7 @@ class DiskFile(object):
 
         renamer(tmppath, os.path.join(self.datadir,
                                       self.obj + extension))
-        os.chown(os.path.join(self.datadir, self.obj + extension), \
+        do_chown(os.path.join(self.datadir, self.obj + extension), \
               self.uid, self.gid)
         self.metadata = metadata
         self.data_file = self.datadir + '/' + self.obj + extension
@@ -355,7 +357,7 @@ class DiskFile(object):
         for fname in os.listdir(self.datadir):
             if fname < timestamp:
                 try:
-                    os.unlink(os.path.join(self.datadir, fname))
+                    do_unlink(os.path.join(self.datadir, fname))
                 except OSError, err:    # pragma: no cover
                     if err.errno != errno.ENOENT:
                         raise
@@ -377,7 +379,7 @@ class DiskFile(object):
         for fname in os.listdir(self.datadir):
             if fname == self.obj:
                 try:
-                    os.unlink(os.path.join(self.datadir, fname))
+                    do_unlink(os.path.join(self.datadir, fname))
                 except OSError, err:
                     if err.errno != errno.ENOENT:
                         raise

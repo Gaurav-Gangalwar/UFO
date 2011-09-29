@@ -267,8 +267,9 @@ class DiskDir(object):
         if delimiter and not prefix:
             prefix = ''
 
-        print 'Container_list prefix, del, datadir', prefix,\
-                                                   delimiter, self.datadir
+        #print 'Container_list prefix, del, datadir', prefix,\
+                                                   #delimiter, self.datadir
+
         objects = []
         object_count = 0
         bytes_used = 0
