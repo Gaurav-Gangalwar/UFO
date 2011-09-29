@@ -320,7 +320,7 @@ class Swauth(object):
             # account DELETE or PUT...
             return None
         referrers, groups = parse_acl(getattr(req, 'acl', None))
-        print 'authorize acl', referrers, groups
+        #print 'authorize acl', referrers, groups
         if referrer_allowed(req.referer, referrers):
             if obj or '.rlistings' in groups:
                 return None

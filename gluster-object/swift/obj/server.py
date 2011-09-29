@@ -273,7 +273,7 @@ class DiskFile(object):
             except OSError:
                 pass
             try:
-                do_unlink(tmppath)
+                do_unlink(tmppath, log=False)
             except OSError:
                 pass
 
@@ -385,7 +385,7 @@ class DiskFile(object):
                         raise
 
         #Remove entire path for object.
-        remove_dir_path(self.obj_path, self.container_path)
+        #remove_dir_path(self.obj_path, self.container_path)
 
         self.metadata = {}
         self.data_file = None

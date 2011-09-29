@@ -1133,11 +1133,12 @@ def do_close(fd):
         raise
     return True
 
-def do_unlink(path):
+def do_unlink(path, log = True):
     try:
         os.unlink(path)
     except Exception, err:
-        logging.exception("Unlink failed on %s err: %s", path, str(err))
+        if log:
+            logging.exception("Unlink failed on %s err: %s", path, str(err))
         if err.errno != errno.ENOENT:
             raise
     return True
@@ -1182,7 +1183,7 @@ def do_setxattr(path, key, value):
     
         
 
-def do_getxattr(path, key):
+def do_getxattr(path, key, log = True):
     fd = None
     if not os.path.isdir(path):
         fd = do_open(path, 'rb')
@@ -1192,7 +1193,8 @@ def do_getxattr(path, key):
         try:
             value = getxattr(fd, key)
         except Exception, err:
-            logging.exception("getxattr failed on %s key %s err: %s", path, key, str(err))
+            if log:
+                logging.exception("getxattr failed on %s key %s err: %s", path, key, str(err))
             raise
         finally:
             if fd and not os.path.isdir(path):
@@ -1234,7 +1236,8 @@ def read_metadata(path):
     key = 0
     while True:
         try:
-            metadata += do_getxattr(path, '%s%s' % (METADATA_KEY, (key or '')))
+            metadata += do_getxattr(path, '%s%s' % (METADATA_KEY, (key or '')),
+                            log = False)
         except Exception:
             break
         key += 1

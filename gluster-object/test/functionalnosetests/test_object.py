@@ -504,33 +504,45 @@ class TestObject(unittest.TestCase):
 
         # Delete the third set of segments
         def delete(url, token, parsed, conn, objnum):
-            conn.request('DELETE', '%s/%s/segments3/%s' % (parsed.path,
+            conn.request('DELETE', '%s/%s/%s' % (parsed.path,
                 acontainer, str(objnum)), '', {'X-Auth-Token': token})
             return check_response(conn)
         for objnum in xrange(len(segments3)):
-            resp = retry(delete, objnum)
+            resp = retry(delete, ("segments3/%s")%objnum)
             resp.read()
             self.assertEquals(resp.status, 204)
+
+        resp = retry(delete, "segments3")
+        resp.read()
+        self.assertEquals(resp.status, 204)
 
         # Delete the second set of segments
         def delete(url, token, parsed, conn, objnum):
-            conn.request('DELETE', '%s/%s/segments2/%s' % (parsed.path,
+            conn.request('DELETE', '%s/%s/%s' % (parsed.path,
                 self.container, str(objnum)), '', {'X-Auth-Token': token})
             return check_response(conn)
         for objnum in xrange(len(segments2)):
-            resp = retry(delete, objnum)
+            resp = retry(delete, ("segments2/%s")%objnum)
             resp.read()
             self.assertEquals(resp.status, 204)
 
+        resp = retry(delete, "segments2")
+        resp.read()
+        self.assertEquals(resp.status, 204)
+
         # Delete the first set of segments
         def delete(url, token, parsed, conn, objnum):
-            conn.request('DELETE', '%s/%s/segments1/%s' % (parsed.path,
+            conn.request('DELETE', '%s/%s/%s' % (parsed.path,
                 self.container, str(objnum)), '', {'X-Auth-Token': token})
             return check_response(conn)
         for objnum in xrange(len(segments1)):
-            resp = retry(delete, objnum)
+            resp = retry(delete, ("segments1/%s")%objnum)
             resp.read()
             self.assertEquals(resp.status, 204)
+
+        resp = retry(delete, "segments1")
+        resp.read()
+        self.assertEquals(resp.status, 204)
 
         # Delete the extra container
         def delete(url, token, parsed, conn):
