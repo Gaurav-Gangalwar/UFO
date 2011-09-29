@@ -1106,7 +1106,11 @@ def do_chown(path, uid, gid):
 
 def do_stat(path):
     try:
-        buf = os.stat(path)
+        #Check for fd.
+        if isinstance(path, int):
+            buf = os.fstat(path)
+        else:
+            buf = os.stat(path)
     except Exception, err:
         logging.exception("Stat failed on %s err: %s", path, str(err))
         raise
@@ -1455,7 +1459,7 @@ def get_container_details_from_fs(cont_path, const_path,
                                                    object_count, bytes_used,
                                                    obj_list)
 
-            dir_list.append(path + ':' + str(os.lstat(path).st_mtime))
+            dir_list.append(path + ':' + str(do_stat(path).st_mtime))
 
     if memcache:
         memcache.set(strip_obj_storage_path(cont_path), obj_list)
@@ -1483,7 +1487,7 @@ def get_container_details_from_memcache(cont_path, const_path,
 
     for i in dir_contents.split(','):
         path, mtime = i.split(':')
-        if mtime != str(os.lstat(path).st_mtime):
+        if mtime != str(do_stat(path).st_mtime):
             return get_container_details_from_fs(cont_path, const_path,
                                                  memcache=memcache)
 
@@ -1519,7 +1523,7 @@ def get_account_details_from_fs(acc_path, memcache=None):
 
     if memcache:
         memcache.set(strip_obj_storage_path(acc_path) + '_container_list', container_list)
-        memcache.set(strip_obj_storage_path(acc_path)+'_mtime', str(os.lstat(acc_path).st_mtime))
+        memcache.set(strip_obj_storage_path(acc_path)+'_mtime', str(do_stat(acc_path).st_mtime))
         memcache.set(strip_obj_storage_path(acc_path)+'_container_count', container_count)
 
     return container_list, container_count
@@ -1527,7 +1531,7 @@ def get_account_details_from_fs(acc_path, memcache=None):
 def get_account_details_from_memcache(acc_path, memcache=None):
     if memcache:
         mtime = memcache.get(strip_obj_storage_path(acc_path)+'_mtime')
-        if not mtime or mtime != str(os.lstat(acc_path).st_mtime):
+        if not mtime or mtime != str(do_stat(acc_path).st_mtime):
             return get_account_details_from_fs(acc_path, memcache)
         container_list = memcache.get(strip_obj_storage_path(acc_path) + '_container_list')
         container_count = memcache.get(strip_obj_storage_path(acc_path)+'_container_count')

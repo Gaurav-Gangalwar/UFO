@@ -37,7 +37,7 @@ from swift.common.utils import get_logger, get_param, hash_path, \
     write_metadata, clean_metadata, dir_empty, mkdirs, rmdirs, validate_account, \
     validate_container, validate_object, check_valid_account, is_marker, \
     get_container_details, get_account_details, create_container_metadata, \
-    create_account_metadata, create_object_metadata, cache_from_env
+    create_account_metadata, create_object_metadata, cache_from_env, do_stat
 from swift.common.constraints import CONTAINER_LISTING_LIMIT, \
     check_mount, check_float, check_utf8
 from swift.common.bufferedhttp import http_connect
@@ -127,7 +127,7 @@ class DiskDir(object):
         files = os.listdir(self.datadir)
         files_count = len(files)
         for file in files:
-            dir_bytes_used += os.stat(self.datadir + '/' + file).st_size
+            dir_bytes_used += do_stat(self.datadir + '/' + file).st_size
 
         return files_count, dir_bytes_used
 

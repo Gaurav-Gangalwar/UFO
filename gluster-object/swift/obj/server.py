@@ -42,7 +42,7 @@ from swift.common.utils import mkdirs, normalize_timestamp, \
     split_path, drop_buffer_cache, get_logger, write_pickle, \
     read_metadata, write_metadata, mkdirs, rmdirs, validate_object, \
     check_valid_account, create_object_metadata, remove_dir_path, do_open, \
-    do_close, do_unlink, do_chown
+    do_close, do_unlink, do_chown, do_stat
 from swift.common.bufferedhttp import http_connect
 from swift.common.constraints import check_object_creation, check_mount, \
     check_float, check_utf8
@@ -635,7 +635,7 @@ class ObjectController(object):
                 X_TIMESTAMP: request.headers['x-timestamp'],
                 X_CONTENT_TYPE: content_type,
                 X_ETAG: etag,
-                X_CONTENT_LENGTH: str(os.fstat(fd).st_size),
+                X_CONTENT_LENGTH: str(do_stat(fd).st_size),
                 X_TYPE: OBJECT,
                 X_OBJECT_TYPE: FILE,
             }
