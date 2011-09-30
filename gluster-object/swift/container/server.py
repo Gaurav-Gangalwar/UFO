@@ -46,7 +46,7 @@ from swift.common.exceptions import ConnectionTimeout
 from swift.common.utils import X_CONTENT_TYPE, X_CONTENT_LENGTH, X_TIMESTAMP,\
      X_PUT_TIMESTAMP, X_TYPE, X_ETAG, X_OBJECTS_COUNT, X_BYTES_USED, \
      X_CONTAINER_COUNT, CONTAINER, DEFAULT_UID, \
-     DEFAULT_GID, XML_EXTRA_ENTITIES
+     DEFAULT_GID, XML_EXTRA_ENTITIES, TRUE_VALUES
 from swift import plugins
 
 DATADIR = 'containers'
@@ -428,6 +428,7 @@ class ContainerController(object):
     def __init__(self, conf):
         self.logger = get_logger(conf, log_route='container-server')
         self.fs_name = conf.get('fs_name', 'Glusterfs')
+        self.enable_caching = conf.get('enable_caching', 'False') in TRUE_VALUES
         self.fs_object = getattr(plugins, self.fs_name, False)
         if not self.fs_object:
             raise Exception('Invalid Filesystem name %s', self.fs_name)
@@ -776,7 +777,10 @@ class ContainerController(object):
         return HTTPNoContent(request=req)
 
     def __call__(self, env, start_response):
-        self.memcache = cache_from_env(env)
+        if self.enable_caching:
+            self.memcache = cache_from_env(env)
+        else:
+            self.memcache = None
         start_time = time.time()
         req = Request(env)
         self.logger.txn_id = req.headers.get('x-trans-id', None)

@@ -128,7 +128,8 @@ _fs_conf.read(os.path.join('/etc/gluster-object', 'fs.conf'))
 _mount_path = _fs_conf.get('DEFAULT', 'mount_path', '/mnt/gluster-object')
 
 # Used when reading config values
-TRUE_VALUES = set(('true', '1', 'yes', 'on', 't', 'y'))
+TRUE_VALUES = set(('true', '1', 'yes', 'on', 't', 'y', 'True', 'Yes', 'On', 'T',
+        'Y'))
 
 # Used with xml.sax.saxutils.escape
 XML_EXTRA_ENTITIES = dict((chr(x), '&#x%x;' % x) for x in xrange(1, 0x20))
@@ -1301,7 +1302,7 @@ def check_user_xattr(path):
         return False
     do_setxattr(path, 'user.test.key1', 'value1')
     try:
-        removexattr(path, 'user.key1')
+        removexattr(path, 'user.test.key1')
     except Exception, err:
         logging.exception("removexattr failed on %s err: %s", path, str(err))
         #Remove xattr may fail in case of concurrent remove.
