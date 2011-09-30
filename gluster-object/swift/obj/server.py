@@ -42,7 +42,7 @@ from swift.common.utils import mkdirs, normalize_timestamp, \
     split_path, drop_buffer_cache, get_logger, write_pickle, \
     read_metadata, write_metadata, mkdirs, rmdirs, validate_object, \
     check_valid_account, create_object_metadata, remove_dir_path, do_open, \
-    do_close, do_unlink, do_chown, do_stat
+    do_close, do_unlink, do_chown, do_stat, do_listdir
 from swift.common.bufferedhttp import http_connect
 from swift.common.constraints import check_object_creation, check_mount, \
     check_float, check_utf8
@@ -354,7 +354,7 @@ class DiskFile(object):
         :param timestamp: timestamp to compare with each file
         """
         timestamp = normalize_timestamp(timestamp)
-        for fname in os.listdir(self.datadir):
+        for fname in do_listdir(self.datadir):
             if fname < timestamp:
                 try:
                     do_unlink(os.path.join(self.datadir, fname))
@@ -376,7 +376,7 @@ class DiskFile(object):
                 logging.error('Unable to delete dir %s' % os.path.join(self.datadir, self.obj))
             return
 
-        for fname in os.listdir(self.datadir):
+        for fname in do_listdir(self.datadir):
             if fname == self.obj:
                 try:
                     do_unlink(os.path.join(self.datadir, fname))

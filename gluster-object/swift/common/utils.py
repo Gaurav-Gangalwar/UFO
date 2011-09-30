@@ -246,7 +246,7 @@ def mkdirs(path):
                 raise
 
 def dir_empty(path):
-    return not os.listdir(path)
+    return not do_listdir(path)
     
 def rmdirs(path):
     if os.path.isdir(path) and dir_empty(path):
@@ -766,11 +766,11 @@ def iter_devices_partitions(devices_dir, item_type):
     :param item_type: One of 'accounts', 'containers', or 'objects'
     :returns: Each iteration returns a tuple of (device, partition)
     """
-    devices = os.listdir(devices_dir)
+    devices = do_listdir(devices_dir)
     shuffle(devices)
     devices_partitions = []
     for device in devices:
-        partitions = os.listdir(os.path.join(devices_dir, device, item_type))
+        partitions = do_listdir(os.path.join(devices_dir, device, item_type))
         shuffle(partitions)
         devices_partitions.append((device, iter(partitions)))
     yielded = True
@@ -792,7 +792,7 @@ def unlink_older_than(path, mtime):
     :mtime: timestamp of oldest file to keep
     """
     if os.path.exists(path):
-        for fname in os.listdir(path):
+        for fname in do_listdir(path):
             fpath = os.path.join(path, fname)
             try:
                 if os.path.getmtime(fpath) < mtime:
@@ -958,7 +958,7 @@ def audit_location_generator(devices, datadir, mount_check=True, logger=None):
                     on devices
     :param logger: a logger object
     '''
-    device_dir = os.listdir(devices)
+    device_dir = do_listdir(devices)
     # randomize devices in case of process restart before sweep completed
     shuffle(device_dir)
     for device in device_dir:
@@ -971,22 +971,22 @@ def audit_location_generator(devices, datadir, mount_check=True, logger=None):
         datadir_path = os.path.join(devices, device, datadir)
         if not os.path.exists(datadir_path):
             continue
-        partitions = os.listdir(datadir_path)
+        partitions = do_listdir(datadir_path)
         for partition in partitions:
             part_path = os.path.join(datadir_path, partition)
             if not os.path.isdir(part_path):
                 continue
-            suffixes = os.listdir(part_path)
+            suffixes = do_listdir(part_path)
             for suffix in suffixes:
                 suff_path = os.path.join(part_path, suffix)
                 if not os.path.isdir(suff_path):
                     continue
-                hashes = os.listdir(suff_path)
+                hashes = do_listdir(suff_path)
                 for hsh in hashes:
                     hash_path = os.path.join(suff_path, hsh)
                     if not os.path.isdir(hash_path):
                         continue
-                    for fname in sorted(os.listdir(hash_path),
+                    for fname in sorted(do_listdir(hash_path),
                                         reverse=True):
                         path = os.path.join(hash_path, fname)
                         yield path, device, partition
@@ -1097,6 +1097,16 @@ def do_makedirs(path):
         if err.errno != errno.EEXIST:
             raise
     return True
+
+
+def do_listdir(path):
+    try:
+        buf = os.listdir(path)
+    except Exception, err:
+        logging.exception("Listdir failed on %s err: %s", path, str(err))
+        raise
+    return buf
+
 def do_chown(path, uid, gid):
     try:
         os.chown(path, uid, gid)
@@ -1282,7 +1292,7 @@ def dir_empty(path):
     """
     if os.path.isdir(path):
         try:
-            files = os.listdir(path)
+            files = do_listdir(path)
         except Exception, err:
             logging.exception("listdir failed on %s err: %s", path, str(err))
             raise
@@ -1515,7 +1525,7 @@ def get_account_details_from_fs(acc_path, memcache=None):
     container_count = 0
 
     if os.path.isdir(acc_path):
-        for name in os.listdir(acc_path):
+        for name in do_listdir(acc_path):
             if not os.path.isdir(acc_path + '/' + name) or \
                name.lower() == 'tmp':
                 continue
