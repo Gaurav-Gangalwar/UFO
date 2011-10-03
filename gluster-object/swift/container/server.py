@@ -527,9 +527,6 @@ class ContainerController(object):
             dir_obj.delete()
             if dir_obj.dir_exists:
                 return HTTPConflict(request=req)
-            resp = self.account_update(req, account, container, dir_obj)
-            if resp:
-                return resp
             if existed:
                 return HTTPNoContent(request=req)
             return HTTPNotFound()
@@ -588,10 +585,6 @@ class ContainerController(object):
             if metadata:
                 dir_obj.put(metadata)
 
-            if created:
-                resp = self.account_update(req, account, container, dir_obj)
-                if resp:
-                    return resp
         if created:
             return HTTPCreated(request=req)
         else:

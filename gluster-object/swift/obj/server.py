@@ -654,13 +654,6 @@ class ObjectController(object):
                 logging.error('Object put failed %s %s %s' % (account, container, obj))
                 return HTTPUnprocessableEntity(request=request)
 
-        self.container_update('PUT', account, container, obj, request.headers,
-            {'x-content-length': file_obj.metadata[X_CONTENT_LENGTH],
-             'x-content-type': file_obj.metadata[X_CONTENT_TYPE],
-             'x-timestamp': file_obj.metadata[X_TIMESTAMP],
-             'x-etag': file_obj.metadata[X_ETAG],
-             'x-trans-id': request.headers.get('x-trans-id', '-')},
-            device)
         resp = HTTPCreated(request=request, etag=etag)
         return resp
 
@@ -830,11 +823,6 @@ class ObjectController(object):
         if not file_obj.is_deleted():
             logging.error('Object is not deleted %s %s %s' % (account, container, obj))
             return HTTPUnprocessableEntity(request=request)
-        self.container_update('DELETE', account, container, obj,
-            request.headers, {'x-timestamp': metadata[X_TIMESTAMP],
-            'x-content-length': metadata[X_CONTENT_LENGTH],
-            'x-trans-id': request.headers.get('x-trans-id', '-')},
-            device)
         resp = response_class(request=request)
         return resp
 

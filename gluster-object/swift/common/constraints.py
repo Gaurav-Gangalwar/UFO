@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import os
+import logging
 
 from webob.exc import HTTPBadRequest, HTTPLengthRequired, \
     HTTPRequestEntityTooLarge
@@ -39,6 +40,15 @@ ACCOUNT_LISTING_LIMIT = 10000
 MAX_ACCOUNT_NAME_LENGTH = 255
 MAX_CONTAINER_NAME_LENGTH = 255
 
+def validate_obj_name(obj):
+    if len(obj) > MAX_OBJECT_NAME_LENGTH:
+        logging.error('Object name too long %s' % obj)
+        return False
+    if obj == '.' or obj == '..':
+        logging.error('Object name cannot be . or .. %s' % obj)
+        return False
+
+    return True
 
 def check_metadata(req, target_type):
     """
@@ -105,9 +115,9 @@ def check_object_creation(req, object_name):
         return HTTPBadRequest(body='Copy requests require a zero byte body',
                               request=req, content_type='text/plain')
     for obj in object_name.split('/'):
-        if len(obj) > MAX_OBJECT_NAME_LENGTH:
-            return HTTPBadRequest(body='Object name length of %d longer than %d' %
-                    (len(obj), MAX_OBJECT_NAME_LENGTH), request=req,
+        if not validate_obj_name(obj):
+            return HTTPBadRequest(body='Invalid object name %s' %
+                    (obj), request=req,
                     content_type='text/plain')
     if 'Content-Type' not in req.headers:
         return HTTPBadRequest(request=req, content_type='text/plain',
