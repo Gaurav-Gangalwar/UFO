@@ -58,3 +58,5 @@ if __name__ == '__main__':
     resp = conn.getresponse()
     if resp.status // 100 != 2:
         exit('User deletion failed: %s %s' % (resp.status, resp.reason))
+    else:
+        print str(resp.status) + ' ' + resp.reason
