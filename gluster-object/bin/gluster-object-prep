@@ -65,4 +65,4 @@ if __name__ == '__main__':
     if resp.status // 100 != 2:
         exit('Auth subsystem prep failed: %s %s' % (resp.status, resp.reason))
     else:
-        print str(resp.status) + ' ' + resp.reason
+        print 'gluster-object-prep successful.'
