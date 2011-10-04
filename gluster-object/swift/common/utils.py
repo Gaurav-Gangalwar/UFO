@@ -72,6 +72,8 @@ X_BYTES_USED = 'X-Bytes-Used'
 X_CONTAINER_COUNT = 'X-Container-Count'
 X_OBJECT_TYPE = 'X-Object-Type'
 
+VERSION_STRING = 'UFO-1.1'
+
 DIR = 'dir'
 MARKER_DIR = 'marker_dir'
 FILE = 'file'

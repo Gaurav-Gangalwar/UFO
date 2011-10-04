@@ -40,7 +40,7 @@ from swift.common.utils import cache_from_env, get_logger, \
      split_path, urlparse, get_account_list, check_account_exists, \
      get_account_id
 from swift.common.utils import RESELLER_PREFIX, DEFAULT_UID, DEFAULT_GID, \
-     HASH_PATH_SUFFIX
+     HASH_PATH_SUFFIX, VERSION_STRING
 import swift.common.authtypes
 from swift import plugins
 
@@ -427,6 +427,8 @@ class Swauth(object):
                 elif user == '.services':
                     handler = self.handle_set_services
                     #logging.error('Set services not supported %s' % account)
+        elif version == 'version':
+            handler = self.handle_get_version
         if not handler:
             req.response = HTTPBadRequest(request=req)
         else:
@@ -493,6 +495,15 @@ class Swauth(object):
         for acc_name in get_account_list(self.fs_object):
             listing.append({'name': acc_name})
         return Response(body=json.dumps({'accounts': listing}))
+    
+
+    def handle_get_version(self, req):
+        if not self.is_reseller_admin(req):
+            return HTTPForbidden(request=req)
+                
+        version = VERSION_STRING
+        return Response(body=json.dumps(version))
+        
 
     def handle_get_account(self, req):
         """

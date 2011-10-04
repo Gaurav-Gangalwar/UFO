@@ -91,6 +91,7 @@ setup(
         'bin/gluster-object-config',
         'bin/gluster-object-start',
         'bin/gluster-object-stop',
+        'bin/gluster-object-version',
         ],
     entry_points={
         'paste.app_factory': [
